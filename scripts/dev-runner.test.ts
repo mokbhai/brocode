@@ -189,6 +189,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.equal(env.T3CODE_NO_BROWSER, "1");
         assert.equal(env.T3CODE_PORT, "58090");
         assert.equal(env.PORT, "8891");
+        assert.equal(env.VITE_WS_URL, "ws://127.0.0.1:58090");
         assert.equal(env.T3CODE_HOME, resolve("/tmp/tauri-t3"));
         assert.equal(env.DPCODE_HOME, resolve("/tmp/tauri-t3"));
         assert.equal(env.T3CODE_AUTH_TOKEN, undefined);

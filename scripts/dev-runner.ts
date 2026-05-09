@@ -153,7 +153,10 @@ export function createDevRunnerEnv({
       ...baseEnv,
       T3CODE_PORT: String(serverPort),
       PORT: String(webPort),
-      VITE_WS_URL: `ws://[::1]:${serverPort}`,
+      VITE_WS_URL:
+        mode === "dev:desktop-tauri"
+          ? `ws://127.0.0.1:${serverPort}`
+          : `ws://[::1]:${serverPort}`,
       VITE_DEV_SERVER_URL: devUrl?.toString() ?? `http://localhost:${webPort}`,
       DPCODE_HOME: resolvedBaseDir,
       T3CODE_HOME: resolvedBaseDir,
