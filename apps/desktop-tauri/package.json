@@ -1,0 +1,20 @@
+{
+  "name": "@t3tools/desktop-tauri",
+  "version": "0.0.42",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "typecheck": "tsc --noEmit",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@t3tools/web": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

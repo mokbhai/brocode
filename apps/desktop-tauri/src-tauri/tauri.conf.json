@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DP Code Tauri (POC)",
+  "version": "0.0.42",
+  "identifier": "com.t3tools.dpcode.tauri.dev",
+  "build": {
+    "beforeDevCommand": {
+      "script": "bun run dev -- --host 127.0.0.1 --port 5733",
+      "cwd": "../web",
+      "wait": false
+    },
+    "beforeBuildCommand": {
+      "script": "bun run build",
+      "cwd": "../web"
+    },
+    "devUrl": "http://127.0.0.1:5733",
+    "frontendDist": "../../web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DP Code Tauri (POC)",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["../../desktop/resources/icon.png"],
+    "targets": "all"
+  }
+}
