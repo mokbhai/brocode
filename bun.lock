@@ -34,6 +34,7 @@
       "name": "@t3tools/desktop-tauri",
       "version": "0.0.42",
       "dependencies": {
+        "@t3tools/contracts": "workspace:*",
         "@tauri-apps/api": "^2",
       },
       "devDependencies": {

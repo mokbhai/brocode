@@ -1,4 +1,5 @@
 mod backend;
+mod bridge;
 mod errors;
 mod paths;
 
@@ -11,6 +12,14 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![
+            bridge::get_ws_url,
+            bridge::pick_folder,
+            bridge::save_file,
+            bridge::confirm,
+            bridge::open_external,
+            bridge::show_in_folder,
+        ])
         .setup(|app| {
             let repo_root = paths::repo_root_from_manifest_dir();
             let home_dir = env::var_os("DPCODE_HOME")

@@ -5,13 +5,13 @@
   "identifier": "com.t3tools.dpcode.tauri.dev",
   "build": {
     "beforeDevCommand": {
-      "script": "bun run dev -- --host 127.0.0.1 --port 5733",
-      "cwd": "../web",
+      "script": "node scripts/run-web-with-tauri-entry.js run dev -- --host 127.0.0.1 --port 5733",
+      "cwd": ".",
       "wait": false
     },
     "beforeBuildCommand": {
-      "script": "bun run build",
-      "cwd": "../web"
+      "script": "node scripts/run-web-with-tauri-entry.js run build",
+      "cwd": "."
     },
     "devUrl": "http://127.0.0.1:5733",
     "frontendDist": "../../web/dist"

@@ -10,7 +10,8 @@
     "test": "cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2"
+    "@tauri-apps/api": "^2",
+    "@t3tools/contracts": "workspace:*"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

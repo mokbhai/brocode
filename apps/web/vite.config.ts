@@ -2,11 +2,15 @@ import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import pkg from "./package.json" with { type: "json" };
 
 const port = Number(process.env.PORT ?? 5733);
 const sourcemapEnv = process.env.T3CODE_WEB_SOURCEMAP?.trim().toLowerCase();
+const useTauriEntry = process.env.T3CODE_TAURI_ENTRY === "1";
+const desktopTauriEntry = fileURLToPath(new URL("../desktop-tauri/src/main.ts", import.meta.url));
+const webEntry = fileURLToPath(new URL("./src/main.tsx", import.meta.url));
 
 const buildSourcemap =
   sourcemapEnv === "0" || sourcemapEnv === "false"
@@ -17,6 +21,17 @@ const buildSourcemap =
 
 export default defineConfig({
   plugins: [
+    {
+      name: "dpcode-tauri-entry",
+      transformIndexHtml(html) {
+        if (!useTauriEntry) return html;
+
+        return html.replace(
+          `src="/src/main.tsx"`,
+          `src="/@fs/${desktopTauriEntry}"`,
+        );
+      },
+    },
     tanstackRouter(),
     react(),
     babel({
@@ -43,11 +58,17 @@ export default defineConfig({
     "import.meta.env.APP_VERSION": JSON.stringify(pkg.version),
   },
   resolve: {
+    alias: {
+      "dpcode-web-entry": webEntry,
+    },
     tsconfigPaths: true,
   },
   server: {
     port,
     strictPort: true,
+    fs: {
+      allow: ["../.."],
+    },
     hmr: {
       // Explicit config so Vite's HMR WebSocket connects reliably
       // inside Electron's BrowserWindow. Vite 8 uses console.debug for
