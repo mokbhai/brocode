@@ -101,4 +101,4 @@ The third risk is packaging complexity. The current release process is Electron-
 
 ## Current Status
 
-Status: design approved for spec writing. Implementation has not started.
+Status: Phase 1 proof of concept complete; Phase 2 is next.

@@ -18,7 +18,7 @@ describe("run-tauri-dev", () => {
       readonly args: ReadonlyArray<string>;
       readonly config: {
         readonly build: {
-          readonly beforeDevCommand: { readonly script: string };
+          readonly beforeDevCommand: { readonly cwd: string; readonly script: string };
           readonly devUrl: string;
         };
       };
@@ -26,6 +26,7 @@ describe("run-tauri-dev", () => {
 
     assert.equal(dryRun.config.build.devUrl, "http://127.0.0.1:8891");
     assert.ok(dryRun.config.build.beforeDevCommand.script.includes("--port 8891"));
+    assert.equal(dryRun.config.build.beforeDevCommand.cwd, "..");
     assert.ok(dryRun.args.includes(JSON.stringify(dryRun.config)));
   });
 });

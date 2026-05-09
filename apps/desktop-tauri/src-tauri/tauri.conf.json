@@ -6,12 +6,12 @@
   "build": {
     "beforeDevCommand": {
       "script": "node scripts/run-web-with-tauri-entry.js run dev -- --host 127.0.0.1 --port 5733",
-      "cwd": ".",
+      "cwd": "..",
       "wait": false
     },
     "beforeBuildCommand": {
       "script": "node scripts/run-web-with-tauri-entry.js run build",
-      "cwd": "."
+      "cwd": ".."
     },
     "devUrl": "http://127.0.0.1:5733",
     "frontendDist": "../../web/dist"

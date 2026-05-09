@@ -26,7 +26,7 @@ const config = {
   build: {
     beforeDevCommand: {
       script: `node scripts/run-web-with-tauri-entry.js run dev -- --host 127.0.0.1 --port ${webPort}`,
-      cwd: ".",
+      cwd: "..",
       wait: false,
     },
     devUrl,
