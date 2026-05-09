@@ -18,7 +18,7 @@ export const DEFAULT_T3_HOME = Effect.map(Effect.service(Path.Path), (path) =>
   path.join(homedir(), ".dpcode"),
 );
 
-const MODE_ARGS = {
+export const MODE_ARGS = {
   dev: [
     "run",
     "dev",
@@ -31,6 +31,7 @@ const MODE_ARGS = {
   "dev:server": ["run", "dev", "--filter=t3"],
   "dev:web": ["run", "dev", "--filter=@t3tools/web"],
   "dev:desktop": ["run", "dev", "--filter=@t3tools/desktop", "--filter=@t3tools/web", "--parallel"],
+  "dev:desktop-tauri": ["run", "dev", "--filter=@t3tools/desktop-tauri"],
 } as const satisfies Record<string, ReadonlyArray<string>>;
 
 type DevMode = keyof typeof MODE_ARGS;
@@ -152,12 +153,17 @@ export function createDevRunnerEnv({
       ...baseEnv,
       T3CODE_PORT: String(serverPort),
       PORT: String(webPort),
-      ELECTRON_RENDERER_PORT: String(webPort),
       VITE_WS_URL: `ws://[::1]:${serverPort}`,
       VITE_DEV_SERVER_URL: devUrl?.toString() ?? `http://localhost:${webPort}`,
       DPCODE_HOME: resolvedBaseDir,
       T3CODE_HOME: resolvedBaseDir,
     };
+
+    if (mode === "dev:desktop") {
+      output.ELECTRON_RENDERER_PORT = String(webPort);
+    } else {
+      delete output.ELECTRON_RENDERER_PORT;
+    }
 
     if (host !== undefined) {
       output.T3CODE_HOST = host;
@@ -169,8 +175,11 @@ export function createDevRunnerEnv({
       delete output.T3CODE_AUTH_TOKEN;
     }
 
-    if (noBrowser !== undefined) {
-      output.T3CODE_NO_BROWSER = noBrowser ? "1" : "0";
+    const resolvedNoBrowser =
+      noBrowser === undefined && mode === "dev:desktop-tauri" ? true : noBrowser;
+
+    if (resolvedNoBrowser !== undefined) {
+      output.T3CODE_NO_BROWSER = resolvedNoBrowser ? "1" : "0";
     } else {
       delete output.T3CODE_NO_BROWSER;
     }
@@ -194,6 +203,11 @@ export function createDevRunnerEnv({
 
     if (mode === "dev:server" || mode === "dev:web") {
       output.T3CODE_MODE = "web";
+      delete output.T3CODE_DESKTOP_WS_URL;
+    }
+
+    if (mode === "dev:desktop-tauri") {
+      output.T3CODE_MODE = "desktop";
       delete output.T3CODE_DESKTOP_WS_URL;
     }
 
@@ -294,6 +308,17 @@ export function resolveModePortOffsets<R = NetService>({
     const checkPort = (checkPortAvailability ??
       defaultCheckPortAvailability) as PortAvailabilityCheck<R>;
 
+    if (mode === "dev:desktop-tauri") {
+      const sharedOffset = yield* findFirstAvailableOffset({
+        startOffset,
+        requireServerPort: !hasExplicitServerPort,
+        requireWebPort: true,
+        checkPortAvailability: checkPort,
+      });
+
+      return { serverOffset: sharedOffset, webOffset: sharedOffset };
+    }
+
     if (mode === "dev:web") {
       if (hasExplicitDevUrl) {
         return { serverOffset: startOffset, webOffset: startOffset };
@@ -330,6 +355,79 @@ export function resolveModePortOffsets<R = NetService>({
     });
 
     return { serverOffset: sharedOffset, webOffset: sharedOffset };
+  });
+}
+
+interface ValidateModeOptionsInput {
+  readonly mode: DevMode;
+  readonly devUrl: URL | undefined;
+}
+
+export function validateModeOptions({
+  mode,
+  devUrl,
+}: ValidateModeOptionsInput): Effect.Effect<void, DevRunnerError> {
+  return Effect.gen(function* () {
+    if (mode === "dev:desktop-tauri" && devUrl !== undefined) {
+      return yield* new DevRunnerError({
+        message:
+          "dev:desktop-tauri does not support --dev-url/VITE_DEV_SERVER_URL. Use PORT/T3CODE_PORT_OFFSET so the Tauri devUrl and beforeDevCommand stay consistent.",
+      });
+    }
+  });
+}
+
+interface EnsureResolvedPortAvailabilityInput<R = NetService> {
+  readonly mode: DevMode;
+  readonly env: NodeJS.ProcessEnv;
+  readonly checkPortAvailability?: PortAvailabilityCheck<R>;
+}
+
+export function ensureResolvedPortAvailability<R = NetService>({
+  mode,
+  env,
+  checkPortAvailability,
+}: EnsureResolvedPortAvailabilityInput<R>): Effect.Effect<void, DevRunnerError, R> {
+  return Effect.gen(function* () {
+    if (mode !== "dev:desktop-tauri") {
+      return;
+    }
+
+    const checkPort = (checkPortAvailability ??
+      defaultCheckPortAvailability) as PortAvailabilityCheck<R>;
+    const portsToCheck = [
+      ["T3CODE_PORT", env.T3CODE_PORT],
+      ["PORT", env.PORT],
+    ] as const;
+    const resolvedPorts: Array<readonly [string, number]> = [];
+
+    for (const [name, value] of portsToCheck) {
+      const port = Number(value);
+      if (!Number.isInteger(port) || port < 1 || port > MAX_PORT) {
+        return yield* new DevRunnerError({
+          message: `${name}=${String(value)} is not a valid TCP port.`,
+        });
+      }
+
+      resolvedPorts.push([name, port]);
+    }
+
+    const serverPort = resolvedPorts.find(([name]) => name === "T3CODE_PORT")?.[1];
+    const webPort = resolvedPorts.find(([name]) => name === "PORT")?.[1];
+    if (serverPort === webPort) {
+      return yield* new DevRunnerError({
+        message: "dev:desktop-tauri requires distinct server and web ports.",
+      });
+    }
+
+    for (const [name, port] of resolvedPorts) {
+      const available = yield* checkPort(port);
+      if (!available) {
+        return yield* new DevRunnerError({
+          message: `${name}=${port} is already in use.`,
+        });
+      }
+    }
   });
 }
 
@@ -376,8 +474,22 @@ const resolveOptionalBooleanOverride = (
   return envValue;
 };
 
+const hasExplicitAuthTokenArg = (args: ReadonlyArray<string> = process.argv.slice(2)): boolean =>
+  args.some(
+    (arg) =>
+      arg === "--auth-token" ||
+      arg.startsWith("--auth-token=") ||
+      arg === "--token" ||
+      arg.startsWith("--token="),
+  );
+
 export function runDevRunnerWithInput(input: DevRunnerCliInput) {
   return Effect.gen(function* () {
+    yield* validateModeOptions({
+      mode: input.mode,
+      devUrl: input.devUrl,
+    });
+
     const { portOffset, devInstance } = yield* OffsetConfig.asEffect().pipe(
       Effect.mapError(
         (cause) =>
@@ -416,7 +528,10 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
       serverOffset,
       webOffset,
       t3Home: input.t3Home,
-      authToken: input.authToken,
+      authToken:
+        input.mode === "dev:desktop-tauri" && !hasExplicitAuthTokenArg()
+          ? undefined
+          : input.authToken,
       noBrowser: resolveOptionalBooleanOverride(input.noBrowser, envOverrides.noBrowser),
       autoBootstrapProjectFromCwd: resolveOptionalBooleanOverride(
         input.autoBootstrapProjectFromCwd,
@@ -429,6 +544,11 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
       host: input.host,
       port: input.port,
       devUrl: input.devUrl,
+    });
+
+    yield* ensureResolvedPortAvailability({
+      mode: input.mode,
+      env,
     });
 
     const selectionSuffix =

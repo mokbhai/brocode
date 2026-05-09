@@ -6,9 +6,12 @@ import { Effect } from "effect";
 
 import {
   createDevRunnerEnv,
+  ensureResolvedPortAvailability,
   findFirstAvailableOffset,
+  MODE_ARGS,
   resolveModePortOffsets,
   resolveOffset,
+  validateModeOptions,
 } from "./dev-runner.ts";
 
 it.layer(NodeServices.layer)("dev-runner", (it) => {
@@ -161,6 +164,37 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.equal(env.DPCODE_HOME, resolve("/tmp/my-t3"));
       }),
     );
+
+    it.effect("sets isolated desktop env for Tauri dev mode", () =>
+      Effect.gen(function* () {
+        const env = yield* createDevRunnerEnv({
+          mode: "dev:desktop-tauri",
+          baseEnv: {
+            ELECTRON_RENDERER_PORT: "9999",
+            T3CODE_AUTH_TOKEN: "inherited-token",
+          },
+          serverOffset: 3158,
+          webOffset: 3158,
+          t3Home: "/tmp/tauri-t3",
+          authToken: undefined,
+          noBrowser: undefined,
+          autoBootstrapProjectFromCwd: undefined,
+          logWebSocketEvents: undefined,
+          host: undefined,
+          port: 58090,
+          devUrl: undefined,
+        });
+
+        assert.equal(env.T3CODE_MODE, "desktop");
+        assert.equal(env.T3CODE_NO_BROWSER, "1");
+        assert.equal(env.T3CODE_PORT, "58090");
+        assert.equal(env.PORT, "8891");
+        assert.equal(env.T3CODE_HOME, resolve("/tmp/tauri-t3"));
+        assert.equal(env.DPCODE_HOME, resolve("/tmp/tauri-t3"));
+        assert.equal(env.T3CODE_AUTH_TOKEN, undefined);
+        assert.equal(env.ELECTRON_RENDERER_PORT, undefined);
+      }),
+    );
   });
 
   describe("findFirstAvailableOffset", () => {
@@ -278,5 +312,96 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.deepStrictEqual(offsets, { serverOffset: 0, webOffset: 0 });
       }),
     );
+
+    it.effect("requires server and web ports for Tauri dev mode", () =>
+      Effect.gen(function* () {
+        const taken = new Set([3773, 5733]);
+        const offsets = yield* resolveModePortOffsets({
+          mode: "dev:desktop-tauri",
+          startOffset: 0,
+          hasExplicitServerPort: false,
+          hasExplicitDevUrl: false,
+          checkPortAvailability: (port) => Effect.succeed(!taken.has(port)),
+        });
+
+        assert.deepStrictEqual(offsets, { serverOffset: 1, webOffset: 1 });
+      }),
+    );
+
+    it.effect("requires a web port for Tauri dev mode even when dev-url is present", () =>
+      Effect.gen(function* () {
+        const taken = new Set([5733]);
+        const offsets = yield* resolveModePortOffsets({
+          mode: "dev:desktop-tauri",
+          startOffset: 0,
+          hasExplicitServerPort: false,
+          hasExplicitDevUrl: true,
+          checkPortAvailability: (port) => Effect.succeed(!taken.has(port)),
+        });
+
+        assert.deepStrictEqual(offsets, { serverOffset: 1, webOffset: 1 });
+      }),
+    );
+  });
+
+  describe("validateModeOptions", () => {
+    it.effect("rejects explicit dev-url for Tauri dev mode", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          validateModeOptions({
+            mode: "dev:desktop-tauri",
+            devUrl: new URL("http://127.0.0.1:9999"),
+          }),
+        );
+
+        assert.ok(error.message.includes("dev:desktop-tauri does not support --dev-url"));
+      }),
+    );
+  });
+
+  describe("ensureResolvedPortAvailability", () => {
+    it.effect("checks explicit server and resolved web ports for Tauri dev mode", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          ensureResolvedPortAvailability({
+            mode: "dev:desktop-tauri",
+            env: {
+              T3CODE_PORT: "58090",
+              PORT: "8891",
+            },
+            checkPortAvailability: (port) => Effect.succeed(port !== 58090),
+          }),
+        );
+
+        assert.ok(error.message.includes("T3CODE_PORT=58090 is already in use"));
+      }),
+    );
+
+    it.effect("rejects identical server and web ports for Tauri dev mode", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          ensureResolvedPortAvailability({
+            mode: "dev:desktop-tauri",
+            env: {
+              T3CODE_PORT: "5733",
+              PORT: "5733",
+            },
+            checkPortAvailability: () => Effect.succeed(true),
+          }),
+        );
+
+        assert.equal(error.message, "dev:desktop-tauri requires distinct server and web ports.");
+      }),
+    );
+  });
+
+  describe("MODE_ARGS", () => {
+    it("runs only the Tauri desktop package for Tauri dev mode", () => {
+      assert.deepStrictEqual(MODE_ARGS["dev:desktop-tauri"], [
+        "run",
+        "dev",
+        "--filter=@t3tools/desktop-tauri",
+      ]);
+    });
   });
 });
