@@ -1,6 +1,5 @@
 mod backend;
 mod bridge;
-mod errors;
 mod paths;
 
 use std::{env, path::PathBuf};
