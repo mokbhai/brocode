@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   WORKTREE_BRANCH_PREFIX,
-  buildDpcodeBranchName,
+  buildBroCodeBranchName,
   buildTemporaryWorktreeBranchName,
   isTemporaryWorktreeBranch,
-  resolveUniqueDpcodeBranchName,
+  resolveUniqueBroCodeBranchName,
   resolveThreadBranchRegressionGuard,
 } from "./git";
 
@@ -54,35 +54,38 @@ describe("resolveThreadBranchRegressionGuard", () => {
   });
 });
 
-describe("buildDpcodeBranchName", () => {
-  it("uses dpcode as the branch namespace", () => {
-    expect(buildDpcodeBranchName("fix toast copy")).toBe("dpcode/fix-toast-copy");
+describe("buildBroCodeBranchName", () => {
+  it("uses brocode as the branch namespace", () => {
+    expect(buildBroCodeBranchName("fix toast copy")).toBe("brocode/fix-toast-copy");
   });
 
-  it("keeps non-dpcode namespaces inside the dpcode branch", () => {
-    expect(buildDpcodeBranchName("feature/refine-toolbar-actions")).toBe(
-      "dpcode/feature/refine-toolbar-actions",
+  it("keeps non-brocode namespaces inside the brocode branch", () => {
+    expect(buildBroCodeBranchName("feature/refine-toolbar-actions")).toBe(
+      "brocode/feature/refine-toolbar-actions",
     );
   });
 
-  it("normalizes legacy dpcode-style prefixes before rebuilding the branch", () => {
-    expect(buildDpcodeBranchName("t3code/refine toolbar actions")).toBe(
-      "dpcode/refine-toolbar-actions",
+  it("normalizes legacy app-style prefixes before rebuilding the branch", () => {
+    expect(buildBroCodeBranchName("t3code/refine toolbar actions")).toBe(
+      "brocode/refine-toolbar-actions",
+    );
+    expect(buildBroCodeBranchName("dpcode/refine toolbar actions")).toBe(
+      "brocode/refine-toolbar-actions",
     );
   });
 
-  it("falls back to dpcode/update when no preferred name is provided", () => {
-    expect(buildDpcodeBranchName()).toBe("dpcode/update");
+  it("falls back to brocode/update when no preferred name is provided", () => {
+    expect(buildBroCodeBranchName()).toBe("brocode/update");
   });
 });
 
-describe("resolveUniqueDpcodeBranchName", () => {
-  it("increments suffix when the dpcode branch already exists", () => {
+describe("resolveUniqueBroCodeBranchName", () => {
+  it("increments suffix when the brocode branch already exists", () => {
     expect(
-      resolveUniqueDpcodeBranchName(
-        ["main", "dpcode/fix-toast-copy", "dpcode/fix-toast-copy-2"],
+      resolveUniqueBroCodeBranchName(
+        ["main", "brocode/fix-toast-copy", "brocode/fix-toast-copy-2"],
         "fix toast copy",
       ),
-    ).toBe("dpcode/fix-toast-copy-3");
+    ).toBe("brocode/fix-toast-copy-3");
   });
 });

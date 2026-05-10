@@ -12,7 +12,7 @@ import {
   CODEX_PLAN_MODE_DEVELOPER_INSTRUCTIONS,
   CodexAppServerManager,
   classifyCodexStderrLine,
-  disableDpCodeBrowserPluginInCodexConfig,
+  disableBroCodeBrowserPluginInCodexConfig,
   ensureIsolatedScratchWorkspace,
   isRecoverableThreadResumeError,
   normalizeCodexModelSlug,
@@ -294,7 +294,7 @@ describe("buildCodexProcessEnv", () => {
         env: {
           SHELL: "/bin/zsh",
           PATH: "/usr/bin",
-          DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN: "0",
+          BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN: "0",
         },
         homePath: tempDir,
         platform: "darwin",
@@ -323,7 +323,7 @@ describe("buildCodexProcessEnv", () => {
         PATH: "/usr/bin",
         CODEX_HOME: "/tmp/.codex",
         AZURE_OPENAI_API_KEY: "existing-secret",
-        DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN: "0",
+        BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN: "0",
       },
       platform: "darwin",
       readEnvironment,
@@ -336,15 +336,15 @@ describe("buildCodexProcessEnv", () => {
   it("allows the configured desktop browser-use socket in the Codex sandbox", () => {
     const env = buildCodexProcessEnv({
       env: {
-        DPCODE_BROWSER_USE_PIPE_PATH: "/tmp/codex-browser-use/dpcode.sock",
+        BROCODE_BROWSER_USE_PIPE_PATH: "/tmp/codex-browser-use/brocode.sock",
         NODE_REPL_SANDBOX_ALLOWED_UNIX_SOCKETS: "/tmp/existing.sock",
-        DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN: "0",
+        BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN: "0",
       },
       platform: "darwin",
     });
 
     expect(env.NODE_REPL_SANDBOX_ALLOWED_UNIX_SOCKETS).toBe(
-      "/tmp/existing.sock,/tmp/codex-browser-use/dpcode.sock",
+      "/tmp/existing.sock,/tmp/codex-browser-use/brocode.sock",
     );
   });
 
@@ -357,7 +357,7 @@ describe("buildCodexProcessEnv", () => {
     ).toBe("/tmp/codex-browser-use/t3.sock");
   });
 
-  it("disables the local dpcode-browser plugin in DP Code's Codex home overlay", () => {
+  it("disables the local brocode-browser plugin in BroCode's Codex home overlay", () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "t3-codex-env-"));
     const runtimeHome = mkdtempSync(path.join(os.tmpdir(), "t3-runtime-home-"));
     try {
@@ -367,21 +367,23 @@ describe("buildCodexProcessEnv", () => {
           '[plugins."github@openai-curated"]',
           "enabled = true",
           "",
-          '[plugins."dpcode-browser@local"]',
+          '[plugins."brocode-browser@local"]',
           "enabled = true",
         ].join("\n"),
         "utf8",
       );
 
       const env = buildCodexProcessEnv({
-        env: { DPCODE_HOME: runtimeHome },
+        env: { BROCODE_HOME: runtimeHome },
         homePath: tempDir,
         platform: "darwin",
       });
 
-      expect(env.CODEX_HOME).toBe(path.join(runtimeHome, "codex-home-overlay"));
-      expect(readFileSync(path.join(env.CODEX_HOME, "config.toml"), "utf8")).toContain(
-        '[plugins."dpcode-browser@local"]\nenabled = false',
+      const codexHome = env.CODEX_HOME;
+      expect(codexHome).toBe(path.join(runtimeHome, "codex-home-overlay"));
+      if (!codexHome) throw new Error("expected CODEX_HOME");
+      expect(readFileSync(path.join(codexHome, "config.toml"), "utf8")).toContain(
+        '[plugins."brocode-browser@local"]\nenabled = false',
       );
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -389,9 +391,9 @@ describe("buildCodexProcessEnv", () => {
     }
   });
 
-  it("adds a disabled dpcode-browser plugin section when Codex config does not contain one", () => {
-    expect(disableDpCodeBrowserPluginInCodexConfig('model = "gpt-5.5"')).toContain(
-      '[plugins."dpcode-browser@local"]\nenabled = false',
+  it("adds a disabled brocode-browser plugin section when Codex config does not contain one", () => {
+    expect(disableBroCodeBrowserPluginInCodexConfig('model = "gpt-5.5"')).toContain(
+      '[plugins."brocode-browser@local"]\nenabled = false',
     );
   });
 });
@@ -520,7 +522,7 @@ describe("startSession", () => {
     expect(buildCodexInitializeParams()).toEqual({
       clientInfo: {
         name: "t3code_desktop",
-        title: "DP Code Desktop",
+        title: "BroCode Desktop",
         version: "0.1.0",
       },
       capabilities: {
@@ -531,7 +533,7 @@ describe("startSession", () => {
 
   it("uses an isolated scratch workspace path when no cwd is provided", () => {
     const cwd = ensureIsolatedScratchWorkspace(asThreadId("thread-1"));
-    expect(cwd).toContain(`${path.sep}dpcode-codex-workspaces${path.sep}thread-1`);
+    expect(cwd).toContain(`${path.sep}brocode-codex-workspaces${path.sep}thread-1`);
   });
 
   it("fails fast with an upgrade message when codex is below the minimum supported version", async () => {
@@ -558,7 +560,7 @@ describe("startSession", () => {
       )
       .mockImplementation(() => {
         throw new Error(
-          "Codex CLI v0.36.0 is too old for DP Code. Upgrade to v0.37.0 or newer and restart DP Code.",
+          "Codex CLI v0.36.0 is too old for BroCode. Upgrade to v0.37.0 or newer and restart BroCode.",
         );
       });
 
@@ -570,7 +572,7 @@ describe("startSession", () => {
           runtimeMode: "full-access",
         }),
       ).rejects.toThrow(
-        "Codex CLI v0.36.0 is too old for DP Code. Upgrade to v0.37.0 or newer and restart DP Code.",
+        "Codex CLI v0.36.0 is too old for BroCode. Upgrade to v0.37.0 or newer and restart BroCode.",
       );
       expect(versionCheck).toHaveBeenCalledTimes(1);
       expect(events).toEqual([
@@ -578,7 +580,7 @@ describe("startSession", () => {
           method: "session/startFailed",
           kind: "error",
           message:
-            "Codex CLI v0.36.0 is too old for DP Code. Upgrade to v0.37.0 or newer and restart DP Code.",
+            "Codex CLI v0.36.0 is too old for BroCode. Upgrade to v0.37.0 or newer and restart BroCode.",
         },
       ]);
     } finally {

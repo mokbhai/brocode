@@ -127,8 +127,8 @@ mod tests {
     #[test]
     fn path_for_bridge_uses_display_string() {
         assert_eq!(
-            super::path_for_bridge(PathBuf::from("/tmp/dpcode")).as_deref(),
-            Some("/tmp/dpcode"),
+            super::path_for_bridge(PathBuf::from("/tmp/brocode")).as_deref(),
+            Some("/tmp/brocode"),
         );
     }
 
@@ -157,8 +157,8 @@ mod tests {
         assert_eq!(super::non_empty_path(""), None);
         assert_eq!(super::non_empty_path("   \n\t"), None);
         assert_eq!(
-            super::non_empty_path("/tmp/dpcode"),
-            Some(PathBuf::from("/tmp/dpcode"))
+            super::non_empty_path("/tmp/brocode"),
+            Some(PathBuf::from("/tmp/brocode"))
         );
     }
 }

@@ -27,7 +27,7 @@ export const SETTINGS_SECTION_IDS = [
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
-export type SettingsNavGroupId = "app" | "dpcode";
+export type SettingsNavGroupId = "app" | "brocode";
 
 export type SettingsNavItem = {
   id: SettingsSectionId;
@@ -43,7 +43,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   label: string;
 }> = [
   { id: "app", label: "App" },
-  { id: "dpcode", label: "DP Code" },
+  { id: "brocode", label: "BroCode" },
 ] as const;
 
 export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
@@ -83,7 +83,7 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
     id: "worktrees",
     group: "app",
     label: "Worktrees",
-    description: "Review and clean up the worktrees created by DP Code.",
+    description: "Review and clean up the worktrees created by BroCode.",
     icon: WorktreeIcon,
     eyebrow: "Workspace management",
   },
@@ -97,7 +97,7 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
   },
   {
     id: "models",
-    group: "dpcode",
+    group: "brocode",
     label: "Models",
     description: "Git writing defaults and custom model slugs.",
     icon: BrainIcon,
@@ -105,7 +105,7 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
   },
   {
     id: "advanced",
-    group: "dpcode",
+    group: "brocode",
     label: "Advanced",
     description: "Provider installs, keybindings, recovery, and version info.",
     icon: WrenchIcon,

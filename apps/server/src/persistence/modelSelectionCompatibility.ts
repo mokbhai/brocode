@@ -18,7 +18,7 @@ function readTrimmedString(record: Record<string, unknown>, key: string): string
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-// Imported instance ids may be runtime names rather than DP Code provider literals.
+// Imported instance ids may be runtime names rather than BroCode provider literals.
 function inferProviderFromLabel(label: string): ModelProviderKind | undefined {
   const lowerLabel = label.toLowerCase();
   if (lowerLabel.includes("opencode")) {
@@ -117,7 +117,7 @@ export function normalizePersistedModelSelection(input: unknown): unknown {
   }
 
   // Newer T3 Code writes provider-less selections as { instanceId, model } and
-  // option rows as [{ id, value }]; DP Code stores canonical provider/options objects.
+  // option rows as [{ id, value }]; BroCode stores canonical provider/options objects.
   return normalizeLegacyModelSelection({
     provider: input.provider ?? input.instanceId,
     model,

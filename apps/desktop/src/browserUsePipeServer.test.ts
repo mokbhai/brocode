@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
 import {
+  BROCODE_BROWSER_USE_PIPE_ENV,
   DPCODE_BROWSER_USE_PIPE_ENV,
   resolveConfiguredBrowserUsePipePath,
   resolveDefaultBrowserUsePipePath,
@@ -19,18 +20,30 @@ describe("browser-use pipe path resolution", () => {
     const pipePath = resolveDefaultBrowserUsePipePath("darwin");
 
     expect(dirname(pipePath)).toBe(`${tmpdir()}/codex-browser-use`);
-    expect(basename(pipePath)).toMatch(/^dpcode-iab-\d+\.sock$/);
+    expect(basename(pipePath)).toMatch(/^brocode-iab-\d+\.sock$/);
   });
 
   it("prefers an explicit desktop pipe path from the environment", () => {
     expect(
       resolveConfiguredBrowserUsePipePath(
         {
-          [DPCODE_BROWSER_USE_PIPE_ENV]: "/tmp/codex-browser-use/custom.sock",
+          [BROCODE_BROWSER_USE_PIPE_ENV]: "/tmp/codex-browser-use/custom.sock",
           [T3CODE_BROWSER_USE_PIPE_ENV]: "/tmp/codex-browser-use/legacy.sock",
         },
         "darwin",
       ),
     ).toBe("/tmp/codex-browser-use/custom.sock");
+  });
+
+  it("falls back to the previous DPCode pipe env name", () => {
+    expect(
+      resolveConfiguredBrowserUsePipePath(
+        {
+          [DPCODE_BROWSER_USE_PIPE_ENV]: "/tmp/codex-browser-use/dp.sock",
+          [T3CODE_BROWSER_USE_PIPE_ENV]: "/tmp/codex-browser-use/legacy.sock",
+        },
+        "darwin",
+      ),
+    ).toBe("/tmp/codex-browser-use/dp.sock");
   });
 });

@@ -2,7 +2,7 @@
  * Sanitize an arbitrary string into a valid, lowercase git branch fragment.
  * Strips quotes, collapses separators, limits to 64 chars.
  */
-export const WORKTREE_BRANCH_PREFIX = "dpcode";
+export const WORKTREE_BRANCH_PREFIX = "brocode";
 const TEMP_WORKTREE_BRANCH_PATTERN = new RegExp(`^${WORKTREE_BRANCH_PREFIX}\\/[0-9a-f]{8}$`);
 
 export function sanitizeBranchFragment(raw: string): string {
@@ -36,7 +36,7 @@ export function sanitizeFeatureBranchName(raw: string): string {
 }
 
 const AUTO_FEATURE_BRANCH_FALLBACK = "feature/update";
-const DPCODE_BRANCH_FALLBACK = "update";
+const BROCODE_BRANCH_FALLBACK = "update";
 
 /**
  * Resolve a unique `feature/…` branch name that doesn't collide with
@@ -64,18 +64,19 @@ export function resolveAutoFeatureBranchName(
   return `${resolvedBase}-${suffix}`;
 }
 
-export function buildDpcodeBranchName(preferredBranch?: string | null): string {
-  const normalizedExisting = preferredBranch?.trim().replace(/^(codex|t3code|dpcode)\//i, "") ?? "";
+export function buildBroCodeBranchName(preferredBranch?: string | null): string {
+  const normalizedExisting =
+    preferredBranch?.trim().replace(/^(codex|t3code|dpcode|brocode)\//i, "") ?? "";
   return `${WORKTREE_BRANCH_PREFIX}/${sanitizeBranchFragment(
-    normalizedExisting || DPCODE_BRANCH_FALLBACK,
+    normalizedExisting || BROCODE_BRANCH_FALLBACK,
   )}`;
 }
 
-export function resolveUniqueDpcodeBranchName(
+export function resolveUniqueBroCodeBranchName(
   existingBranchNames: readonly string[],
   preferredBranch?: string | null,
 ): string {
-  const resolvedBase = buildDpcodeBranchName(preferredBranch);
+  const resolvedBase = buildBroCodeBranchName(preferredBranch);
   const existingNames = new Set(existingBranchNames.map((branch) => branch.toLowerCase()));
 
   if (!existingNames.has(resolvedBase)) {

@@ -1,6 +1,6 @@
 /**
  * FILE: homeMigration.ts
- * Purpose: Imports legacy ~/.t3 state into the new ~/.dpcode home on first startup.
+ * Purpose: Imports legacy ~/.t3 state into the new ~/.brocode home on first startup.
  * Layer: Startup utility
  * Depends on: config path derivation, Effect filesystem/path services, and sqlite snapshots
  */
@@ -8,7 +8,8 @@ import { Data, Effect, FileSystem, Path } from "effect";
 
 import { deriveServerPaths } from "./config";
 
-export const DPCODE_HOME_DIRNAME = ".dpcode";
+export const BROCODE_HOME_DIRNAME = ".brocode";
+export const LEGACY_DPCODE_HOME_DIRNAME = ".dpcode";
 export const LEGACY_T3_HOME_DIRNAME = ".t3";
 const MIGRATIONS_DIRNAME = "migrations";
 const LEGACY_IMPORT_MARKER_BASENAME = "import-from-t3-v1.json";
@@ -153,7 +154,7 @@ const snapshotSqliteDatabase = (sourcePath: string, targetPath: string) =>
     },
     catch: (cause) =>
       new HomeMigrationError({
-        message: `Failed to snapshot legacy sqlite database from ${sourcePath} to ${targetPath}. Close other DP Code processes and retry.`,
+        message: `Failed to snapshot legacy sqlite database from ${sourcePath} to ${targetPath}. Close other BroCode processes and retry.`,
         cause,
       }),
   });
@@ -202,7 +203,7 @@ const cleanUpStagingDir = (stagingBaseDir: string) =>
 export const migrateLegacyHomeIfNeeded = Effect.fn(function* (input: LegacyHomeMigrationInput) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const canonicalTargetBaseDir = path.resolve(path.join(input.homeDir, DPCODE_HOME_DIRNAME));
+  const canonicalTargetBaseDir = path.resolve(path.join(input.homeDir, BROCODE_HOME_DIRNAME));
   if (path.resolve(input.baseDir) !== canonicalTargetBaseDir) {
     return {
       status: "skipped",
@@ -211,8 +212,19 @@ export const migrateLegacyHomeIfNeeded = Effect.fn(function* (input: LegacyHomeM
     };
   }
 
-  const legacyBaseDir = path.resolve(path.join(input.homeDir, LEGACY_T3_HOME_DIRNAME));
-  if (!(yield* fs.exists(legacyBaseDir))) {
+  const legacyBaseDirs = [
+    path.resolve(path.join(input.homeDir, LEGACY_DPCODE_HOME_DIRNAME)),
+    path.resolve(path.join(input.homeDir, LEGACY_T3_HOME_DIRNAME)),
+  ];
+  const legacyBaseDir = yield* Effect.gen(function* () {
+    for (const candidate of legacyBaseDirs) {
+      if (yield* fs.exists(candidate)) {
+        return candidate;
+      }
+    }
+    return undefined;
+  });
+  if (!legacyBaseDir) {
     return {
       status: "skipped",
       reason: "legacy-home-missing",
@@ -273,7 +285,7 @@ export const migrateLegacyHomeIfNeeded = Effect.fn(function* (input: LegacyHomeM
 
   const stagingBaseDir = path.join(
     input.homeDir,
-    `.${DPCODE_HOME_DIRNAME.slice(1)}-migration-${process.pid}-${Date.now()}`,
+    `.${BROCODE_HOME_DIRNAME.slice(1)}-migration-${process.pid}-${Date.now()}`,
   );
   const stagingPaths = yield* deriveServerPaths(stagingBaseDir, input.devUrl);
   yield* fs.makeDirectory(stagingPaths.stateDir, { recursive: true });
@@ -292,7 +304,7 @@ export const migrateLegacyHomeIfNeeded = Effect.fn(function* (input: LegacyHomeM
       startedAt: migrationStartedAt,
       migratedAt: marker?.migratedAt ?? migrationStartedAt,
       notes: [
-        "Legacy ~/.t3 data is being imported into ~/.dpcode.",
+        "Legacy app data is being imported into ~/.brocode.",
         "If startup stops midway, the next launch resumes this import instead of starting from scratch.",
       ],
     });
@@ -344,12 +356,12 @@ export const migrateLegacyHomeIfNeeded = Effect.fn(function* (input: LegacyHomeM
       startedAt: migrationStartedAt,
       migratedAt: new Date().toISOString(),
       notes: [
-        "Legacy ~/.t3 data was imported into ~/.dpcode.",
+        "Legacy app data was imported into ~/.brocode.",
         "Existing legacy worktree directories were left in place and are still referenced by absolute path.",
       ],
     });
 
-    yield* Effect.logInfo("imported legacy T3 state into DP Code home", {
+    yield* Effect.logInfo("imported legacy app state into BroCode home", {
       sourceStateDir: sourcePaths.stateDir,
       targetStateDir: targetPaths.stateDir,
       importedArtifacts,
@@ -368,7 +380,7 @@ export const migrateLegacyHomeIfNeeded = Effect.fn(function* (input: LegacyHomeM
       error instanceof HomeMigrationError
         ? error
         : new HomeMigrationError({
-            message: "Failed to import legacy ~/.t3 state into ~/.dpcode.",
+            message: "Failed to import legacy app state into ~/.brocode.",
             cause: error,
           }),
     ),

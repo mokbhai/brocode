@@ -6,15 +6,15 @@ Replace the Electron `webContents` browser runtime with an external installed Ch
 
 ## Runtime Modes
 
-### Isolated DP Code Browser Profile
+### Isolated BroCode Browser Profile
 
-This is the default mode. DP Code detects an installed Chrome, Edge, or Chromium executable, launches it with a dedicated DP Code profile, and enables remote debugging on an available loopback port.
+This is the default mode. BroCode detects an installed Chrome, Edge, or Chromium executable, launches it with a dedicated BroCode profile, and enables remote debugging on an available loopback port.
 
 The browser launch should include:
 
 ```txt
 --remote-debugging-port=<free-port>
---user-data-dir=<dpcode-browser-profile-dir>
+--user-data-dir=<brocode-browser-profile-dir>
 ```
 
 Additional flags may be added only when they are needed for reliability and do not create avoidable security risk.
@@ -27,7 +27,7 @@ This is an advanced mode. The user provides a CDP endpoint such as:
 http://127.0.0.1:9222
 ```
 
-DP Code validates the endpoint by requesting the browser version and target list before enabling automation.
+BroCode validates the endpoint by requesting the browser version and target list before enabling automation.
 
 ## Browser Detection
 
@@ -51,7 +51,7 @@ The browser controller should provide the behavior currently expected by the web
 - copy screenshots to clipboard where supported
 - execute CDP commands for browser-use
 - stream or poll page title, URL, favicon, loading state, and error state
-- clean up launched isolated browser processes when DP Code exits
+- clean up launched isolated browser processes when BroCode exits
 
 ## Privacy And Safety
 
@@ -61,14 +61,14 @@ The existing debug browser mode must display a clear warning before use:
 
 - the connected browser may expose tabs and page contents to automation
 - the user is responsible for how the browser was launched
-- DP Code will only connect to explicit loopback endpoints by default
+- BroCode will only connect to explicit loopback endpoints by default
 
-DP Code should not silently attach to the normal active browser.
+BroCode should not silently attach to the normal active browser.
 
 ## Acceptance Criteria
 
-- DP Code can launch an installed Chromium-family browser with an isolated profile
-- DP Code can connect to a user-provided debug endpoint
+- BroCode can launch an installed Chromium-family browser with an isolated profile
+- BroCode can connect to a user-provided debug endpoint
 - the controller can open, navigate, reload, create tabs, close tabs, select tabs, and capture screenshots
 - browser-use requests can execute CDP commands through the external browser
 - browser process cleanup is reliable for isolated-profile sessions

@@ -2,13 +2,13 @@
 
 ## Goal
 
-Reduce DP Code desktop memory use and improve smoothness on low-end PCs by replacing the Electron desktop shell with a Tauri/Rust shell while preserving the existing TypeScript web UI, TypeScript backend, and shared contracts.
+Reduce BroCode desktop memory use and improve smoothness on low-end PCs by replacing the Electron desktop shell with a Tauri/Rust shell while preserving the existing TypeScript web UI, TypeScript backend, and shared contracts.
 
 The migration should not become a full Rust rewrite. Rust should own native desktop responsibilities: window lifecycle, process supervision, system integrations, update plumbing, and browser runtime launch/control where it is a better fit. Product logic, orchestration, provider runtime handling, contracts, and React UI should remain in the current TypeScript packages unless a later measured bottleneck proves otherwise.
 
 ## Current Constraints
 
-DP Code is not just a browser-wrapped web app. The current Electron desktop package owns:
+BroCode is not just a browser-wrapped web app. The current Electron desktop package owns:
 
 - starting and supervising the local backend process
 - exposing `window.desktopBridge` to the React app
@@ -60,13 +60,13 @@ Safari is not a first-class automation target because browser-use and the curren
 
 Browser automation modes:
 
-1. **Isolated DP Code browser profile**, default and recommended.
-   DP Code launches an installed Chromium-family browser with a dedicated profile and remote debugging enabled. This avoids bundling Chromium while keeping cookies, tabs, extensions, and user browsing state separate from the user's normal browser.
+1. **Isolated BroCode browser profile**, default and recommended.
+   BroCode launches an installed Chromium-family browser with a dedicated profile and remote debugging enabled. This avoids bundling Chromium while keeping cookies, tabs, extensions, and user browsing state separate from the user's normal browser.
 
 2. **Connect to existing debug browser**, advanced.
-   DP Code connects to a user-provided CDP endpoint such as `http://127.0.0.1:9222`. This supports power users who intentionally start a debug-enabled browser.
+   BroCode connects to a user-provided CDP endpoint such as `http://127.0.0.1:9222`. This supports power users who intentionally start a debug-enabled browser.
 
-DP Code should not silently attach to the user's ordinary active browser. In most cases that browser is not attachable without remote debugging, and silent attachment would be a privacy and reliability risk.
+BroCode should not silently attach to the user's ordinary active browser. In most cases that browser is not attachable without remote debugging, and silent attachment would be a privacy and reliability risk.
 
 ## Required Phases
 

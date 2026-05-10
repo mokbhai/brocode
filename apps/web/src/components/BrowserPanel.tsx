@@ -60,11 +60,11 @@ interface BrowserPanelProps {
 
 const BROWSER_BOUNDS_SYNC_BURST_FRAMES = 30;
 const BROWSER_BOUNDS_SYNC_STABLE_FRAME_TARGET = 2;
-const BROWSER_WEBVIEW_PARTITION = "persist:dpcode-browser";
+const BROWSER_WEBVIEW_PARTITION = "persist:brocode-browser";
 const BROWSER_BLANK_URL = "about:blank";
 const BROWSER_PERF_SAMPLE_INTERVAL_MS = 5_000;
-const DPCODE_BROWSER_LABEL = "DPCODE browser";
-const PANEL_RESIZE_OVERLAY_SYNC_EVENT = "dpcode:panel-resize-overlay-sync";
+const BROCODE_BROWSER_LABEL = "BroCode browser";
+const PANEL_RESIZE_OVERLAY_SYNC_EVENT = "brocode:panel-resize-overlay-sync";
 const IMAGE_SIZE_LIMIT_LABEL = `${Math.round(PROVIDER_SEND_TURN_MAX_IMAGE_BYTES / (1024 * 1024))}MB`;
 const NATIVE_BROWSER_OBSCURING_OVERLAY_SELECTOR = [
   "[data-slot='dialog-backdrop']",
@@ -286,7 +286,7 @@ function isBrowserPerfLoggingEnabled(): boolean {
 
   try {
     return (
-      window.localStorage.getItem("dpcode:browser-perf") === "1" ||
+      window.localStorage.getItem("brocode:browser-perf") === "1" ||
       window.localStorage.getItem("t3code:browser-perf") === "1"
     );
   } catch {
@@ -534,7 +534,7 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
     }
 
     const intervalId = window.setInterval(() => {
-      console.info(`[${DPCODE_BROWSER_LABEL} panel perf]`, {
+      console.info(`[${BROCODE_BROWSER_LABEL} panel perf]`, {
         threadId,
         ...perfCountersRef.current,
       });

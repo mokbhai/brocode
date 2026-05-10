@@ -1249,11 +1249,11 @@ describe("ProviderCommandReactor", () => {
         commandId: CommandId.makeUnsafe("cmd-thread-worktree-bootstrap"),
         threadId: ThreadId.makeUnsafe("thread-1"),
         envMode: "worktree",
-        branch: "dpcode/cb661f0d",
+        branch: "brocode/cb661f0d",
         worktreePath: "/tmp/provider-project/.worktrees/cb661f0d",
         associatedWorktreePath: "/tmp/provider-project/.worktrees/cb661f0d",
-        associatedWorktreeBranch: "dpcode/cb661f0d",
-        associatedWorktreeRef: "dpcode/cb661f0d",
+        associatedWorktreeBranch: "brocode/cb661f0d",
+        associatedWorktreeRef: "brocode/cb661f0d",
       }),
     );
 
@@ -1284,20 +1284,20 @@ describe("ProviderCommandReactor", () => {
         (entry) => entry.id === ThreadId.makeUnsafe("thread-1"),
       );
       return (
-        thread?.branch === "dpcode/app-startup-crash" &&
-        thread.associatedWorktreeBranch === "dpcode/app-startup-crash" &&
-        thread.associatedWorktreeRef === "dpcode/app-startup-crash"
+        thread?.branch === "brocode/app-startup-crash" &&
+        thread.associatedWorktreeBranch === "brocode/app-startup-crash" &&
+        thread.associatedWorktreeRef === "brocode/app-startup-crash"
       );
     });
 
     const readModel = await Effect.runPromise(harness.engine.getReadModel());
     const thread = readModel.threads.find((entry) => entry.id === ThreadId.makeUnsafe("thread-1"));
     expect(thread).toMatchObject({
-      branch: "dpcode/app-startup-crash",
+      branch: "brocode/app-startup-crash",
       worktreePath: "/tmp/provider-project/.worktrees/cb661f0d",
       associatedWorktreePath: "/tmp/provider-project/.worktrees/cb661f0d",
-      associatedWorktreeBranch: "dpcode/app-startup-crash",
-      associatedWorktreeRef: "dpcode/app-startup-crash",
+      associatedWorktreeBranch: "brocode/app-startup-crash",
+      associatedWorktreeRef: "brocode/app-startup-crash",
     });
   });
 

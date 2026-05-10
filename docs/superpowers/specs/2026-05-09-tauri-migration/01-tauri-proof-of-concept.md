@@ -2,7 +2,7 @@
 
 ## Objective
 
-Prove that a Tauri shell can host the existing DP Code web UI, start the existing backend, and expose a minimal desktop bridge without disturbing the current Electron app.
+Prove that a Tauri shell can host the existing BroCode web UI, start the existing backend, and expose a minimal desktop bridge without disturbing the current Electron app.
 
 ## Scope
 
@@ -21,7 +21,7 @@ Required behavior:
   - `openExternal`
   - `showInFolder`
 - connect the web UI to the backend WebSocket through the bridge URL
-- run in development without colliding with a user's existing DP Code instance
+- run in development without colliding with a user's existing BroCode instance
 
 ## Non-Goals
 

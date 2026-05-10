@@ -42,7 +42,7 @@ const DEFAULT_BASE_BRANCH_CANDIDATES = ["main", "master"] as const;
 const EMPTY_TREE_OBJECT_ID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const WORKING_TREE_DIFF_TIMEOUT_MS = 15_000;
 const MAX_UNTRACKED_DIFF_CONCURRENCY = 4;
-const AUTO_DETACHED_WORKTREE_DIRNAME = "dpcode";
+const AUTO_DETACHED_WORKTREE_DIRNAME = "brocode";
 const NON_REPOSITORY_STATUS_DETAILS = Object.freeze({
   isRepo: false,
   hasOriginRemote: false,
@@ -2115,7 +2115,7 @@ export const makeGitCore = (options?: { executeOverride?: GitCoreShape["execute"
         yield* executeGit(
           "GitCore.stashAndCheckout.stashPush",
           input.cwd,
-          ["stash", "push", "-u", "-m", `dpcode: stash before switching to ${input.branch}`],
+          ["stash", "push", "-u", "-m", `brocode: stash before switching to ${input.branch}`],
           {
             timeoutMs: 30_000,
             fallbackErrorMessage: "git stash failed",

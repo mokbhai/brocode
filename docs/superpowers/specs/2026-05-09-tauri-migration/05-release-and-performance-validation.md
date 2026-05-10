@@ -34,8 +34,8 @@ Compare Electron and Tauri builds under the same scenarios:
 
 The measurement should separate:
 
-- DP Code shell memory
-- DP Code backend memory
+- BroCode shell memory
+- BroCode backend memory
 - external browser memory
 - total user-visible workflow memory
 

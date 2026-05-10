@@ -22,13 +22,14 @@ import { formatProviderModelOptionName, type ProviderModelOption } from "./provi
 import { ensureNativeApi } from "./nativeApi";
 import { serverQueryKeys, serverSettingsQueryOptions } from "./lib/serverReactQuery";
 
-const APP_SETTINGS_STORAGE_KEY = "dpcode:app-settings:v1";
+const APP_SETTINGS_STORAGE_KEY = "brocode:app-settings:v1";
 const SERVER_SETTINGS_MIGRATION_STORAGE_KEY = "t3code:server-settings-migrated:v1";
 const MAX_CUSTOM_MODEL_COUNT = 32;
 export const MAX_CUSTOM_MODEL_LENGTH = 256;
 export const MIN_CHAT_FONT_SIZE_PX = 11;
 export const MAX_CHAT_FONT_SIZE_PX = 18;
-export const DEFAULT_CHAT_FONT_SIZE_PX = 12;
+export const DEFAULT_CHAT_FONT_SIZE_PX = 14;
+export const DEFAULT_UI_FONT_FAMILY = "Sans";
 
 export const TimestampFormat = Schema.Literals(["locale", "12-hour", "24-hour"]);
 export type TimestampFormat = typeof TimestampFormat.Type;
@@ -121,7 +122,9 @@ export const AppSettingsSchema = Schema.Struct({
   customGeminiModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
   customOpenCodeModels: Schema.Array(Schema.String).pipe(withDefaults(() => [])),
   textGenerationModel: Schema.optional(TrimmedNonEmptyString),
-  uiFontFamily: Schema.String.check(Schema.isMaxLength(256)).pipe(withDefaults(() => "")),
+  uiFontFamily: Schema.String.check(Schema.isMaxLength(256)).pipe(
+    withDefaults(() => DEFAULT_UI_FONT_FAMILY),
+  ),
   defaultProvider: ProviderKind.pipe(withDefaults(() => "codex" as const)),
 });
 export type AppSettings = typeof AppSettingsSchema.Type;

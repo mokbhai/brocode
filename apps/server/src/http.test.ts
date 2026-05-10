@@ -43,7 +43,7 @@ const projectFaviconResolver: ProjectFaviconResolverShape = {
 };
 
 async function makeConfig(overrides: Partial<ServerConfigShape> = {}): Promise<ServerConfigShape> {
-  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-http-test-"));
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-http-test-"));
   tempDirs.push(baseDir);
   const derivedPaths = await Effect.runPromise(
     deriveServerPaths(baseDir, undefined).pipe(Effect.provide(NodeServices.layer)),
@@ -230,7 +230,7 @@ describe("createHttpRequestHandler", () => {
   });
 
   it("serves static files and SPA fallback", async () => {
-    const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-static-test-"));
+    const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-static-test-"));
     tempDirs.push(staticDir);
     fs.writeFileSync(path.join(staticDir, "index.html"), "<main>app</main>");
     fs.writeFileSync(path.join(staticDir, "asset.txt"), "asset");

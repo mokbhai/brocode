@@ -13,7 +13,7 @@ describe("resolveDraftEnvModeAfterBranchChange", () => {
     expect(
       resolveDraftEnvModeAfterBranchChange({
         nextWorktreePath: null,
-        currentWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+        currentWorktreePath: "/repo/.brocode/worktrees/feature-a",
         effectiveEnvMode: "worktree",
       }),
     ).toBe("local");
@@ -32,7 +32,7 @@ describe("resolveDraftEnvModeAfterBranchChange", () => {
   it("uses worktree mode when selecting a branch already attached to a worktree", () => {
     expect(
       resolveDraftEnvModeAfterBranchChange({
-        nextWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+        nextWorktreePath: "/repo/.brocode/worktrees/feature-a",
         currentWorktreePath: null,
         effectiveEnvMode: "local",
       }),
@@ -213,15 +213,15 @@ describe("resolveBranchSelectionTarget", () => {
     expect(
       resolveBranchSelectionTarget({
         activeProjectCwd: "/repo",
-        activeWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+        activeWorktreePath: "/repo/.brocode/worktrees/feature-a",
         branch: {
           isDefault: false,
-          worktreePath: "/repo/.dpcode/worktrees/feature-b",
+          worktreePath: "/repo/.brocode/worktrees/feature-b",
         },
       }),
     ).toEqual({
-      checkoutCwd: "/repo/.dpcode/worktrees/feature-b",
-      nextWorktreePath: "/repo/.dpcode/worktrees/feature-b",
+      checkoutCwd: "/repo/.brocode/worktrees/feature-b",
+      nextWorktreePath: "/repo/.brocode/worktrees/feature-b",
       reuseExistingWorktree: true,
     });
   });
@@ -230,7 +230,7 @@ describe("resolveBranchSelectionTarget", () => {
     expect(
       resolveBranchSelectionTarget({
         activeProjectCwd: "/repo",
-        activeWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+        activeWorktreePath: "/repo/.brocode/worktrees/feature-a",
         branch: {
           isDefault: true,
           worktreePath: "/repo",
@@ -247,7 +247,7 @@ describe("resolveBranchSelectionTarget", () => {
     expect(
       resolveBranchSelectionTarget({
         activeProjectCwd: "/repo",
-        activeWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+        activeWorktreePath: "/repo/.brocode/worktrees/feature-a",
         branch: {
           isDefault: true,
           worktreePath: null,
@@ -264,15 +264,15 @@ describe("resolveBranchSelectionTarget", () => {
     expect(
       resolveBranchSelectionTarget({
         activeProjectCwd: "/repo",
-        activeWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+        activeWorktreePath: "/repo/.brocode/worktrees/feature-a",
         branch: {
           isDefault: false,
           worktreePath: null,
         },
       }),
     ).toEqual({
-      checkoutCwd: "/repo/.dpcode/worktrees/feature-a",
-      nextWorktreePath: "/repo/.dpcode/worktrees/feature-a",
+      checkoutCwd: "/repo/.brocode/worktrees/feature-a",
+      nextWorktreePath: "/repo/.brocode/worktrees/feature-a",
       reuseExistingWorktree: false,
     });
   });

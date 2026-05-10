@@ -1,6 +1,6 @@
 /**
  * FILE: homeMigration.test.ts
- * Purpose: Verifies first-run import and resume behavior for the ~/.t3 -> ~/.dpcode migration.
+ * Purpose: Verifies first-run import and resume behavior for the ~/.t3 -> ~/.brocode migration.
  * Layer: Server startup tests
  * Depends on: deriveServerPaths, node:sqlite fixtures, and the migration marker contract
  */
@@ -15,7 +15,7 @@ import { Effect, FileSystem } from "effect";
 
 import { deriveServerPaths } from "./config";
 import {
-  DPCODE_HOME_DIRNAME,
+  BROCODE_HOME_DIRNAME,
   getLegacyImportMarkerPath,
   LEGACY_T3_HOME_DIRNAME,
   migrateLegacyHomeIfNeeded,
@@ -56,13 +56,13 @@ it.layer(NodeServices.layer)("homeMigration", (it) => {
   it.effect("imports legacy userdata into the new default home", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
-      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-home-migration-"));
+      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-home-migration-"));
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => fs.rmSync(tempHome, { recursive: true, force: true })),
       );
 
       const legacyBaseDir = path.join(tempHome, LEGACY_T3_HOME_DIRNAME);
-      const targetBaseDir = path.join(tempHome, DPCODE_HOME_DIRNAME);
+      const targetBaseDir = path.join(tempHome, BROCODE_HOME_DIRNAME);
       const legacyPaths = yield* deriveServerPaths(legacyBaseDir, undefined);
       const targetPaths = yield* deriveServerPaths(targetBaseDir, undefined);
 
@@ -106,13 +106,13 @@ it.layer(NodeServices.layer)("homeMigration", (it) => {
 
   it.effect("preserves target logs while importing legacy state", () =>
     Effect.gen(function* () {
-      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-home-migration-"));
+      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-home-migration-"));
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => fs.rmSync(tempHome, { recursive: true, force: true })),
       );
 
       const legacyBaseDir = path.join(tempHome, LEGACY_T3_HOME_DIRNAME);
-      const targetBaseDir = path.join(tempHome, DPCODE_HOME_DIRNAME);
+      const targetBaseDir = path.join(tempHome, BROCODE_HOME_DIRNAME);
       const legacyPaths = yield* deriveServerPaths(legacyBaseDir, undefined);
       const targetPaths = yield* deriveServerPaths(targetBaseDir, undefined);
 
@@ -139,13 +139,13 @@ it.layer(NodeServices.layer)("homeMigration", (it) => {
 
   it.effect("skips the import when the target home already owns state", () =>
     Effect.gen(function* () {
-      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-home-migration-"));
+      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-home-migration-"));
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => fs.rmSync(tempHome, { recursive: true, force: true })),
       );
 
       const legacyBaseDir = path.join(tempHome, LEGACY_T3_HOME_DIRNAME);
-      const targetBaseDir = path.join(tempHome, DPCODE_HOME_DIRNAME);
+      const targetBaseDir = path.join(tempHome, BROCODE_HOME_DIRNAME);
       const legacyPaths = yield* deriveServerPaths(legacyBaseDir, undefined);
       const targetPaths = yield* deriveServerPaths(targetBaseDir, undefined);
 
@@ -171,13 +171,13 @@ it.layer(NodeServices.layer)("homeMigration", (it) => {
 
   it.effect("resumes an interrupted migration instead of skipping partially imported state", () =>
     Effect.gen(function* () {
-      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-home-migration-"));
+      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-home-migration-"));
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => fs.rmSync(tempHome, { recursive: true, force: true })),
       );
 
       const legacyBaseDir = path.join(tempHome, LEGACY_T3_HOME_DIRNAME);
-      const targetBaseDir = path.join(tempHome, DPCODE_HOME_DIRNAME);
+      const targetBaseDir = path.join(tempHome, BROCODE_HOME_DIRNAME);
       const legacyPaths = yield* deriveServerPaths(legacyBaseDir, undefined);
       const targetPaths = yield* deriveServerPaths(targetBaseDir, undefined);
       const markerPath = yield* getLegacyImportMarkerPath(targetPaths.stateDir);
@@ -236,13 +236,13 @@ it.layer(NodeServices.layer)("homeMigration", (it) => {
 
   it.effect("imports legacy dev state when a dev URL is active", () =>
     Effect.gen(function* () {
-      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "dpcode-home-migration-"));
+      const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "brocode-home-migration-"));
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => fs.rmSync(tempHome, { recursive: true, force: true })),
       );
 
       const legacyBaseDir = path.join(tempHome, LEGACY_T3_HOME_DIRNAME);
-      const targetBaseDir = path.join(tempHome, DPCODE_HOME_DIRNAME);
+      const targetBaseDir = path.join(tempHome, BROCODE_HOME_DIRNAME);
       const devUrl = new URL("http://127.0.0.1:5173");
       const legacyPaths = yield* deriveServerPaths(legacyBaseDir, devUrl);
       const targetPaths = yield* deriveServerPaths(targetBaseDir, devUrl);

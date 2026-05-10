@@ -71,8 +71,8 @@ import { DesktopBrowserManager } from "./browserManager";
 import { BROWSER_IPC_CHANNELS, registerBrowserIpcHandlers, sendBrowserState } from "./browserIpc";
 import {
   BrowserUsePipeServer,
-  DPCODE_BROWSER_USE_PIPE_ENV,
-  DPCODE_BROWSER_USE_PIPE_PATH,
+  BROCODE_BROWSER_USE_PIPE_ENV,
+  BROCODE_BROWSER_USE_PIPE_PATH,
   T3CODE_BROWSER_USE_PIPE_ENV,
 } from "./browserUsePipeServer";
 import {
@@ -105,15 +105,16 @@ const UPDATE_INSTALL_CHANNEL = "desktop:update-install";
 const NOTIFICATIONS_IS_SUPPORTED_CHANNEL = "desktop:notifications-is-supported";
 const NOTIFICATIONS_SHOW_CHANNEL = "desktop:notifications-show";
 const BASE_DIR =
+  process.env.BROCODE_HOME?.trim() ||
   process.env.DPCODE_HOME?.trim() ||
   process.env.T3CODE_HOME?.trim() ||
-  Path.join(OS.homedir(), ".dpcode");
+  Path.join(OS.homedir(), ".brocode");
 const STATE_DIR = Path.join(BASE_DIR, "userdata");
 const DESKTOP_SCHEME = "t3";
 const ROOT_DIR = Path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const APP_DISPLAY_NAME = isDevelopment ? "DP Code (Dev)" : "DP Code (Alpha)";
-const APP_USER_MODEL_ID = isDevelopment ? "com.t3tools.dpcode.dev" : "com.t3tools.dpcode";
+const APP_DISPLAY_NAME = isDevelopment ? "BroCode (Dev)" : "BroCode (Alpha)";
+const APP_USER_MODEL_ID = isDevelopment ? "com.t3tools.brocode.dev" : "com.t3tools.brocode";
 const COMMIT_HASH_PATTERN = /^[0-9a-f]{7,40}$/i;
 const COMMIT_HASH_DISPLAY_LENGTH = 12;
 const LOG_DIR = Path.join(STATE_DIR, "logs");
@@ -129,9 +130,9 @@ const AUTO_UPDATE_CHECK_TIMEOUT_MS = 45 * 1000;
 const DESKTOP_UPDATE_CHANNEL = "latest";
 const DESKTOP_UPDATE_ALLOW_PRERELEASE = false;
 const BROWSER_PERF_SAMPLE_INTERVAL_MS = 5_000;
-const DPCODE_BROWSER_LABEL = "DPCODE browser";
+const BROCODE_BROWSER_LABEL = "BroCode browser";
 const browserPerfLoggingEnabled =
-  process.env.DPCODE_BROWSER_PERF === "1" || process.env.T3CODE_BROWSER_PERF === "1";
+  process.env.BROCODE_BROWSER_PERF === "1" || process.env.T3CODE_BROWSER_PERF === "1";
 
 type DesktopUpdateErrorContext = DesktopUpdateState["errorContext"];
 
@@ -182,7 +183,7 @@ function startBrowserPerformanceLogging(): void {
         name: metric.name,
       }));
 
-    console.info(`[${DPCODE_BROWSER_LABEL} perf]`, {
+    console.info(`[${BROCODE_BROWSER_LABEL} perf]`, {
       ...snapshot.counters,
       trackedProcessIds: snapshot.trackedProcessIds,
       processes: processMetrics,
@@ -337,7 +338,7 @@ async function reserveBackendEndpoint(reason: string): Promise<void> {
   );
   backendHttpUrl = `http://127.0.0.1:${backendPort}`;
   backendWsUrl = `ws://127.0.0.1:${backendPort}/?token=${encodeURIComponent(backendAuthToken)}`;
-  process.env.DPCODE_DESKTOP_WS_URL = backendWsUrl;
+  process.env.BROCODE_DESKTOP_WS_URL = backendWsUrl;
   process.env.T3CODE_DESKTOP_WS_URL = backendWsUrl;
   writeDesktopLogHeader(`${reason} resolved backend endpoint port=${backendPort}`);
 }
@@ -674,7 +675,7 @@ function handleFatalStartupError(stage: string, error: unknown): void {
   console.error(`[desktop] fatal startup error (${stage})`, error);
   if (!isQuitting) {
     isQuitting = true;
-    dialog.showErrorBox("DP Code failed to start", `Stage: ${stage}\n${message}${detail}`);
+    dialog.showErrorBox("BroCode failed to start", `Stage: ${stage}\n${message}${detail}`);
   }
   stopBackend();
   restoreStdIoCapture?.();
@@ -782,7 +783,7 @@ async function checkForUpdatesFromMenu(): Promise<void> {
     void dialog.showMessageBox({
       type: "info",
       title: "You're up to date!",
-      message: `DP Code ${updateState.currentVersion} is currently the newest version available.`,
+      message: `BroCode ${updateState.currentVersion} is currently the newest version available.`,
       buttons: ["OK"],
     });
   } else if (updateState.status === "error") {
@@ -924,9 +925,9 @@ function resolveNotificationIconPath(): string | null {
     return null;
   }
   if (process.platform === "win32") {
-    return resolveResourcePath("dpcode.png") ?? resolveIconPath("ico");
+    return resolveResourcePath("brocode.png") ?? resolveIconPath("ico");
   }
-  return resolveResourcePath("dpcode.png") ?? resolveIconPath("png");
+  return resolveResourcePath("brocode.png") ?? resolveIconPath("png");
 }
 
 // Keep the app badge aligned with desktop notifications that arrive off-focus.
@@ -1015,11 +1016,11 @@ function showDesktopNotification(input: {
  *
  * Electron derives the default userData path from `productName` in
  * package.json, which currently produces directories with spaces and
- * parentheses (e.g. `~/.config/DP Code (Alpha)` on Linux). This is
+ * parentheses (e.g. `~/.config/BroCode (Alpha)` on Linux). This is
  * unfriendly for shell usage and violates Linux naming conventions.
  *
- * We override it to a clean lowercase DP Code name. Legacy T3 Code/early
- * DP Code Chromium profiles are intentionally left in place so both apps can
+ * We override it to a clean lowercase BroCode name. Legacy T3 Code/early
+ * BroCode Chromium profiles are intentionally left in place so both apps can
  * coexist without sharing renderer storage.
  */
 function resolveUserDataPath(): string {
@@ -1030,12 +1031,12 @@ function resolveUserDataPath(): string {
     legacyPaths: resolveLegacyDesktopUserDataPaths({ appDataBase, isDevelopment }),
   });
   if (seedResult.status === "seeded") {
-    console.info("[desktop] Seeded DP Code Electron profile from legacy profile", {
+    console.info("[desktop] Seeded BroCode Electron profile from legacy profile", {
       sourcePath: seedResult.sourcePath,
       targetPath: seedResult.targetPath,
     });
   } else if (seedResult.status === "seed-failed") {
-    console.warn("[desktop] Failed to seed DP Code Electron profile from legacy profile", {
+    console.warn("[desktop] Failed to seed BroCode Electron profile from legacy profile", {
       sourcePath: seedResult.sourcePath,
       targetPath: seedResult.targetPath,
       error: seedResult.error,
@@ -1381,18 +1382,23 @@ function configureAutoUpdater(): void {
 function backendEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
+    BROCODE_MODE: "desktop",
+    BROCODE_NO_BROWSER: "1",
+    BROCODE_PORT: String(backendPort),
+    BROCODE_HOME: BASE_DIR,
+    BROCODE_AUTH_TOKEN: backendAuthToken,
+    [BROCODE_BROWSER_USE_PIPE_ENV]: BROCODE_BROWSER_USE_PIPE_PATH,
     DPCODE_MODE: "desktop",
     DPCODE_NO_BROWSER: "1",
     DPCODE_PORT: String(backendPort),
     DPCODE_HOME: BASE_DIR,
     DPCODE_AUTH_TOKEN: backendAuthToken,
-    [DPCODE_BROWSER_USE_PIPE_ENV]: DPCODE_BROWSER_USE_PIPE_PATH,
     T3CODE_MODE: "desktop",
     T3CODE_NO_BROWSER: "1",
     T3CODE_PORT: String(backendPort),
     T3CODE_HOME: BASE_DIR,
     T3CODE_AUTH_TOKEN: backendAuthToken,
-    [T3CODE_BROWSER_USE_PIPE_ENV]: DPCODE_BROWSER_USE_PIPE_PATH,
+    [T3CODE_BROWSER_USE_PIPE_ENV]: BROCODE_BROWSER_USE_PIPE_PATH,
   };
 }
 
@@ -1806,7 +1812,7 @@ function registerIpcHandlers(): void {
   registerDesktopVoiceTranscriptionHandler();
   startBrowserPerformanceLogging();
   void ensureBrowserUsePipeServer().catch((error) => {
-    console.warn("[DPCODE browser] Failed to start browser-use native pipe", error);
+    console.warn("[BroCode browser] Failed to start browser-use native pipe", error);
   });
 
   registerBrowserIpcHandlers(ipcMain, browserManager);

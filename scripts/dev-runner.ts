@@ -15,7 +15,7 @@ const MAX_HASH_OFFSET = 3000;
 const MAX_PORT = 65535;
 
 export const DEFAULT_T3_HOME = Effect.map(Effect.service(Path.Path), (path) =>
-  path.join(homedir(), ".dpcode"),
+  path.join(homedir(), ".brocode"),
 );
 
 export const MODE_ARGS = {
@@ -152,12 +152,14 @@ export function createDevRunnerEnv({
     const output: NodeJS.ProcessEnv = {
       ...baseEnv,
       T3CODE_PORT: String(serverPort),
+      BROCODE_PORT: String(serverPort),
       PORT: String(webPort),
       VITE_WS_URL:
         mode === "dev:desktop-tauri"
           ? `ws://127.0.0.1:${serverPort}`
           : `ws://[::1]:${serverPort}`,
       VITE_DEV_SERVER_URL: devUrl?.toString() ?? `http://localhost:${webPort}`,
+      BROCODE_HOME: resolvedBaseDir,
       DPCODE_HOME: resolvedBaseDir,
       T3CODE_HOME: resolvedBaseDir,
     };
@@ -173,8 +175,10 @@ export function createDevRunnerEnv({
     }
 
     if (authToken !== undefined) {
+      output.BROCODE_AUTH_TOKEN = authToken;
       output.T3CODE_AUTH_TOKEN = authToken;
     } else {
+      delete output.BROCODE_AUTH_TOKEN;
       delete output.T3CODE_AUTH_TOKEN;
     }
 
@@ -182,8 +186,10 @@ export function createDevRunnerEnv({
       noBrowser === undefined && mode === "dev:desktop-tauri" ? true : noBrowser;
 
     if (resolvedNoBrowser !== undefined) {
+      output.BROCODE_NO_BROWSER = resolvedNoBrowser ? "1" : "0";
       output.T3CODE_NO_BROWSER = resolvedNoBrowser ? "1" : "0";
     } else {
+      delete output.BROCODE_NO_BROWSER;
       delete output.T3CODE_NO_BROWSER;
     }
 
@@ -200,17 +206,23 @@ export function createDevRunnerEnv({
     }
 
     if (mode === "dev") {
+      output.BROCODE_MODE = "web";
       output.T3CODE_MODE = "web";
+      delete output.BROCODE_DESKTOP_WS_URL;
       delete output.T3CODE_DESKTOP_WS_URL;
     }
 
     if (mode === "dev:server" || mode === "dev:web") {
+      output.BROCODE_MODE = "web";
       output.T3CODE_MODE = "web";
+      delete output.BROCODE_DESKTOP_WS_URL;
       delete output.T3CODE_DESKTOP_WS_URL;
     }
 
     if (mode === "dev:desktop-tauri") {
+      output.BROCODE_MODE = "desktop";
       output.T3CODE_MODE = "desktop";
+      delete output.BROCODE_DESKTOP_WS_URL;
       delete output.T3CODE_DESKTOP_WS_URL;
     }
 
@@ -609,7 +621,7 @@ const devRunnerCli = Command.make("dev-runner", {
     Argument.withDescription("Development mode to run."),
   ),
   t3Home: Flag.string("home-dir").pipe(
-    Flag.withDescription("Base directory for all DP Code data (equivalent to T3CODE_HOME)."),
+    Flag.withDescription("Base directory for all BroCode data (equivalent to T3CODE_HOME)."),
     Flag.withFallbackConfig(optionalStringConfig("T3CODE_HOME")),
   ),
   authToken: Flag.string("auth-token").pipe(

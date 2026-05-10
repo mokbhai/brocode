@@ -1,5 +1,5 @@
 // FILE: desktopWsBridge.test.ts
-// Purpose: Verifies desktop WebSocket URL resolution prefers DP Code env names with legacy fallback.
+// Purpose: Verifies desktop WebSocket URL resolution prefers BroCode env names with legacy fallback.
 
 import { describe, expect, it } from "vitest";
 
@@ -17,13 +17,22 @@ describe("desktopWsBridge", () => {
     expect(normalizeDesktopWsUrl(null)).toBeNull();
   });
 
-  it("prefers DPCODE_DESKTOP_WS_URL over legacy T3CODE_DESKTOP_WS_URL", () => {
+  it("prefers BROCODE_DESKTOP_WS_URL over legacy T3CODE_DESKTOP_WS_URL", () => {
     expect(
       resolveDesktopWsUrlFromEnv({
-        DPCODE_DESKTOP_WS_URL: "ws://127.0.0.1:5000/?token=dp",
+        BROCODE_DESKTOP_WS_URL: "ws://127.0.0.1:5000/?token=dp",
         T3CODE_DESKTOP_WS_URL: "ws://127.0.0.1:3773/?token=legacy",
       } as NodeJS.ProcessEnv),
     ).toBe("ws://127.0.0.1:5000/?token=dp");
+  });
+
+  it("falls back to DPCODE_DESKTOP_WS_URL for older DPCode launchers", () => {
+    expect(
+      resolveDesktopWsUrlFromEnv({
+        DPCODE_DESKTOP_WS_URL: "ws://127.0.0.1:4773/?token=dp",
+        T3CODE_DESKTOP_WS_URL: "ws://127.0.0.1:3773/?token=legacy",
+      } as NodeJS.ProcessEnv),
+    ).toBe("ws://127.0.0.1:4773/?token=dp");
   });
 
   it("falls back to T3CODE_DESKTOP_WS_URL for older launchers", () => {

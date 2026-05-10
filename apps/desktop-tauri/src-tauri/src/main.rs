@@ -21,7 +21,8 @@ fn main() {
         ])
         .setup(|app| {
             let repo_root = paths::repo_root_from_manifest_dir();
-            let home_dir = env::var_os("DPCODE_HOME")
+            let home_dir = env::var_os("BROCODE_HOME")
+                .or_else(|| env::var_os("DPCODE_HOME"))
                 .map(PathBuf::from)
                 .unwrap_or_else(|| paths::default_dev_home(&repo_root));
             let port = env::var("T3CODE_PORT")
@@ -40,7 +41,7 @@ fn main() {
             app.manage(state.clone());
             tauri::async_runtime::spawn(async move {
                 if let Err(error) = start_backend(state, config).await {
-                    eprintln!("failed to start DP Code backend: {error}");
+                    eprintln!("failed to start BroCode backend: {error}");
                 }
             });
 
@@ -50,10 +51,10 @@ fn main() {
             if matches!(event, WindowEvent::CloseRequested { .. }) {
                 let state = window.state::<BackendState>().inner().clone();
                 if let Err(error) = tauri::async_runtime::block_on(stop_backend(state)) {
-                    eprintln!("failed to stop DP Code backend: {error}");
+                    eprintln!("failed to stop BroCode backend: {error}");
                 }
             }
         })
         .run(tauri::generate_context!())
-        .expect("failed to run DP Code Tauri shell");
+        .expect("failed to run BroCode Tauri shell");
 }

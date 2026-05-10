@@ -248,10 +248,12 @@ const CODEX_SPARK_DISABLED_PLAN_TYPES = new Set<CodexPlanType>(["free", "go", "p
 const CODEX_PROCESS_SHELL_ENV_NAMES = ["PATH", "SSH_AUTH_SOCK"] as const;
 const CODEX_DISCOVERY_SESSION_IDLE_MS = 10 * 60 * 1000;
 const NODE_REPL_SANDBOX_ALLOWED_UNIX_SOCKETS = "NODE_REPL_SANDBOX_ALLOWED_UNIX_SOCKETS";
+const BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN_ENV =
+  "BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN";
 const DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN_ENV =
   "DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN";
-const DPCODE_CODEX_HOME_OVERLAY_DIR = "codex-home-overlay";
-const DPCODE_BROWSER_PLUGIN_CONFIG_HEADER = '[plugins."dpcode-browser@local"]';
+const BROCODE_CODEX_HOME_OVERLAY_DIR = "codex-home-overlay";
+const BROCODE_BROWSER_PLUGIN_CONFIG_HEADER = '[plugins."brocode-browser@local"]';
 
 export function resolveCodexBrowserUsePipePath(
   input: {
@@ -261,7 +263,9 @@ export function resolveCodexBrowserUsePipePath(
 ): string {
   const env = input.env ?? process.env;
   const configured =
-    env.DPCODE_BROWSER_USE_PIPE_PATH?.trim() || env.T3CODE_BROWSER_USE_PIPE_PATH?.trim();
+    env.BROCODE_BROWSER_USE_PIPE_PATH?.trim() ||
+    env.DPCODE_BROWSER_USE_PIPE_PATH?.trim() ||
+    env.T3CODE_BROWSER_USE_PIPE_PATH?.trim();
   if (configured) {
     return configured;
   }
@@ -274,11 +278,14 @@ function resolveBaseCodexHomePath(env: NodeJS.ProcessEnv, explicitHomePath?: str
   return explicitHomePath?.trim() || env.CODEX_HOME?.trim() || path.join(homedir(), ".codex");
 }
 
-function shouldDisableDpCodeBrowserPlugin(env: NodeJS.ProcessEnv): boolean {
-  return env[DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN_ENV] !== "0";
+function shouldDisableBroCodeBrowserPlugin(env: NodeJS.ProcessEnv): boolean {
+  if (env[DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN_ENV] === "0") {
+    return false;
+  }
+  return env[BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN_ENV] !== "0";
 }
 
-export function disableDpCodeBrowserPluginInCodexConfig(config: string): string {
+export function disableBroCodeBrowserPluginInCodexConfig(config: string): string {
   const lines = config.split(/\r?\n/);
   const output: string[] = [];
   let inTargetSection = false;
@@ -295,7 +302,7 @@ export function disableDpCodeBrowserPluginInCodexConfig(config: string): string 
     const trimmed = line.trim();
     if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
       closeTargetSection();
-      inTargetSection = trimmed === DPCODE_BROWSER_PLUGIN_CONFIG_HEADER;
+      inTargetSection = trimmed === BROCODE_BROWSER_PLUGIN_CONFIG_HEADER;
       sawTargetSection ||= inTargetSection;
       targetSectionHasEnabled = false;
       output.push(line);
@@ -317,25 +324,26 @@ export function disableDpCodeBrowserPluginInCodexConfig(config: string): string 
     if (output.length > 0 && output.at(-1)?.trim()) {
       output.push("");
     }
-    output.push(DPCODE_BROWSER_PLUGIN_CONFIG_HEADER, "enabled = false");
+    output.push(BROCODE_BROWSER_PLUGIN_CONFIG_HEADER, "enabled = false");
   }
 
   return output.join("\n");
 }
 
-function resolveDpCodeCodexHomeOverlayPath(env: NodeJS.ProcessEnv, sourceHomePath: string): string {
-  const runtimeHome = env.DPCODE_HOME?.trim() || env.T3CODE_HOME?.trim();
+function resolveBroCodeCodexHomeOverlayPath(env: NodeJS.ProcessEnv, sourceHomePath: string): string {
+  const runtimeHome =
+    env.BROCODE_HOME?.trim() || env.DPCODE_HOME?.trim() || env.T3CODE_HOME?.trim();
   const overlayRoot =
-    runtimeHome || path.join(path.dirname(sourceHomePath), ".dpcode", "runtime");
-  return path.join(overlayRoot, DPCODE_CODEX_HOME_OVERLAY_DIR);
+    runtimeHome || path.join(path.dirname(sourceHomePath), ".brocode", "runtime");
+  return path.join(overlayRoot, BROCODE_CODEX_HOME_OVERLAY_DIR);
 }
 
-function prepareDpCodeCodexHomeOverlay(input: {
+function prepareBroCodeCodexHomeOverlay(input: {
   readonly env: NodeJS.ProcessEnv;
   readonly homePath?: string;
 }): string | undefined {
   const sourceHomePath = resolveBaseCodexHomePath(input.env, input.homePath);
-  const overlayHomePath = resolveDpCodeCodexHomeOverlayPath(input.env, sourceHomePath);
+  const overlayHomePath = resolveBroCodeCodexHomeOverlayPath(input.env, sourceHomePath);
   if (path.resolve(sourceHomePath) === path.resolve(overlayHomePath)) {
     return undefined;
   }
@@ -364,7 +372,7 @@ function prepareDpCodeCodexHomeOverlay(input: {
   const sourceConfig = existsSync(sourceConfigPath) ? readFileSync(sourceConfigPath, "utf8") : "";
   writeFileSync(
     path.join(overlayHomePath, "config.toml"),
-    disableDpCodeBrowserPluginInCodexConfig(sourceConfig),
+    disableBroCodeBrowserPluginInCodexConfig(sourceConfig),
     "utf8",
   );
 
@@ -391,8 +399,8 @@ export function buildCodexProcessEnv(
   } = {},
 ): NodeJS.ProcessEnv {
   const baseEnv = { ...(input.env ?? process.env) };
-  const overlayHomePath = shouldDisableDpCodeBrowserPlugin(baseEnv)
-    ? prepareDpCodeCodexHomeOverlay({
+  const overlayHomePath = shouldDisableBroCodeBrowserPlugin(baseEnv)
+    ? prepareBroCodeCodexHomeOverlay({
         env: baseEnv,
         ...(input.homePath ? { homePath: input.homePath } : {}),
       })
@@ -651,7 +659,7 @@ The \`request_user_input\` tool is unavailable in Default mode. If you call it w
 In Default mode, strongly prefer making reasonable assumptions and executing the user's request rather than stopping to ask questions. If you absolutely must ask a question because the answer cannot be discovered from local context and a reasonable assumption would be risky, ask the user directly with a concise plain-text question. Never write a multiple choice question as a textual assistant message.
 </collaboration_mode>${CODEX_BROWSER_TOOL_ROUTING_INSTRUCTIONS}`;
 
-// Maps DP Code's simple runtime toggle to Codex thread-level permission overrides.
+// Maps BroCode's simple runtime toggle to Codex thread-level permission overrides.
 function mapCodexRuntimeMode(runtimeMode: RuntimeMode): {
   readonly approvalPolicy: CodexApprovalPolicy;
   readonly sandbox: CodexSandboxMode;
@@ -692,7 +700,7 @@ function mapCodexRuntimeModeToTurnOverrides(runtimeMode: RuntimeMode): {
 }
 
 export function ensureIsolatedScratchWorkspace(threadId: ThreadId): string {
-  const workspaceRoot = path.join(tmpdir(), "dpcode-codex-workspaces");
+  const workspaceRoot = path.join(tmpdir(), "brocode-codex-workspaces");
   const workspaceDir = path.join(workspaceRoot, String(threadId));
   mkdirSync(workspaceDir, { recursive: true });
   return workspaceDir;
@@ -748,7 +756,7 @@ export function buildCodexInitializeParams() {
   return {
     clientInfo: {
       name: "t3code_desktop",
-      title: "DP Code Desktop",
+      title: "BroCode Desktop",
       version: "0.1.0",
     },
     capabilities: {
@@ -3331,7 +3339,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
         return [];
       }
 
-      // Accept both DP Code's legacy string array and Remodex-style reasoning objects.
+      // Accept both BroCode's legacy string array and Remodex-style reasoning objects.
       const supportedReasoningEfforts = Array.from(
         new Map(
           (

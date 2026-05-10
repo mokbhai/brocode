@@ -98,7 +98,7 @@ function providerIconClassName(
 }
 
 const SEARCHABLE_MODEL_PICKER_THRESHOLD = 15;
-const OPENCODE_FAVORITE_MODEL_STORAGE_KEY = "dpcode:opencode-favourite-models:v1";
+const OPENCODE_FAVORITE_MODEL_STORAGE_KEY = "brocode:opencode-favourite-models:v1";
 const OpenCodeFavoriteModelSlugs = Schema.Array(Schema.String);
 
 function stripParameterizedModelSuffix(model: string): string {

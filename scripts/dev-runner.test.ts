@@ -49,7 +49,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
   });
 
   describe("createDevRunnerEnv", () => {
-    it.effect("defaults T3CODE_HOME to ~/.dpcode when not provided", () =>
+    it.effect("defaults T3CODE_HOME to ~/.brocode when not provided", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
@@ -66,7 +66,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
           devUrl: undefined,
         });
 
-        assert.equal(env.T3CODE_HOME, resolve(homedir(), ".dpcode"));
+        assert.equal(env.T3CODE_HOME, resolve(homedir(), ".brocode"));
       }),
     );
 
@@ -161,6 +161,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         });
 
         assert.equal(env.T3CODE_HOME, resolve("/tmp/my-t3"));
+        assert.equal(env.BROCODE_HOME, resolve("/tmp/my-t3"));
         assert.equal(env.DPCODE_HOME, resolve("/tmp/my-t3"));
       }),
     );
@@ -186,13 +187,18 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         });
 
         assert.equal(env.T3CODE_MODE, "desktop");
+        assert.equal(env.BROCODE_MODE, "desktop");
         assert.equal(env.T3CODE_NO_BROWSER, "1");
+        assert.equal(env.BROCODE_NO_BROWSER, "1");
         assert.equal(env.T3CODE_PORT, "58090");
+        assert.equal(env.BROCODE_PORT, "58090");
         assert.equal(env.PORT, "8891");
         assert.equal(env.VITE_WS_URL, "ws://127.0.0.1:58090");
         assert.equal(env.T3CODE_HOME, resolve("/tmp/tauri-t3"));
+        assert.equal(env.BROCODE_HOME, resolve("/tmp/tauri-t3"));
         assert.equal(env.DPCODE_HOME, resolve("/tmp/tauri-t3"));
         assert.equal(env.T3CODE_AUTH_TOKEN, undefined);
+        assert.equal(env.BROCODE_AUTH_TOKEN, undefined);
         assert.equal(env.ELECTRON_RENDERER_PORT, undefined);
       }),
     );

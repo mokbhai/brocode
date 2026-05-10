@@ -15,7 +15,7 @@ vi.mock("../hooks/useTheme", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),
 }));
 
-async function renderMarkdown(text: string, cwd = "C:\\Users\\LENOVO\\dpcode") {
+async function renderMarkdown(text: string, cwd = "C:\\Users\\LENOVO\\brocode") {
   const { default: ChatMarkdown } = await import("./ChatMarkdown");
 
   return renderToStaticMarkup(<ChatMarkdown text={text} cwd={cwd} isStreaming={false} />);

@@ -46,9 +46,9 @@ export interface ProviderServiceLiveOptions {
 
 const DEFAULT_PROVIDER_RUNTIME_IDLE_STOP_MS = 10 * 60 * 1000;
 const PROVIDER_RUNTIME_IDLE_STOP_MS = Number.isFinite(
-  Number(process.env.DPCODE_PROVIDER_RUNTIME_IDLE_STOP_MS),
+  Number(process.env.BROCODE_PROVIDER_RUNTIME_IDLE_STOP_MS),
 )
-  ? Math.max(0, Number(process.env.DPCODE_PROVIDER_RUNTIME_IDLE_STOP_MS))
+  ? Math.max(0, Number(process.env.BROCODE_PROVIDER_RUNTIME_IDLE_STOP_MS))
   : DEFAULT_PROVIDER_RUNTIME_IDLE_STOP_MS;
 
 const ProviderRollbackConversationInput = Schema.Struct({

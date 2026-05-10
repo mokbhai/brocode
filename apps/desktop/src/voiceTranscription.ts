@@ -178,7 +178,7 @@ async function resolveDesktopVoiceAuth(
         params: {
           clientInfo: {
             name: "dp-code-desktop",
-            title: "DP Code Desktop",
+            title: "BroCode Desktop",
             version: app.getVersion(),
           },
           capabilities: { experimentalApi: true },
@@ -200,7 +200,7 @@ async function requestDesktopVoiceTranscription(input: {
   readonly token: string;
   readonly transcriptionUrl: string;
 }): Promise<{ statusCode: number; body: string }> {
-  const boundary = `DPCodeVoice-${Crypto.randomUUID()}`;
+  const boundary = `BroCodeVoice-${Crypto.randomUUID()}`;
   const preamble = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="voice.wav"\r\nContent-Type: ${input.mimeType}\r\n\r\n`,
     "utf8",

@@ -286,8 +286,8 @@ const PROJECT_CONTEXT_MENU_ARCHIVE_ICON = renderToStaticMarkup(<HiOutlineArchive
 const PROJECT_CONTEXT_MENU_DELETE_THREADS_ICON = renderToStaticMarkup(<Trash2 />);
 
 type DebugFeatureFlagsWindow = Window & {
-  dpcodeShowFeatureFlags?: () => void;
-  dpcodeHideFeatureFlags?: () => void;
+  brocodeShowFeatureFlags?: () => void;
+  brocodeHideFeatureFlags?: () => void;
 };
 
 function readDebugFeatureFlagsMenuVisibility(): boolean {
@@ -1202,18 +1202,18 @@ export default function Sidebar() {
       updateVisibility();
     };
 
-    debugWindow.dpcodeShowFeatureFlags = showFeatureFlags;
-    debugWindow.dpcodeHideFeatureFlags = hideFeatureFlags;
+    debugWindow.brocodeShowFeatureFlags = showFeatureFlags;
+    debugWindow.brocodeHideFeatureFlags = hideFeatureFlags;
     window.addEventListener("storage", updateVisibility);
     updateVisibility();
 
     return () => {
       window.removeEventListener("storage", updateVisibility);
-      if (debugWindow.dpcodeShowFeatureFlags === showFeatureFlags) {
-        delete debugWindow.dpcodeShowFeatureFlags;
+      if (debugWindow.brocodeShowFeatureFlags === showFeatureFlags) {
+        delete debugWindow.brocodeShowFeatureFlags;
       }
-      if (debugWindow.dpcodeHideFeatureFlags === hideFeatureFlags) {
-        delete debugWindow.dpcodeHideFeatureFlags;
+      if (debugWindow.brocodeHideFeatureFlags === hideFeatureFlags) {
+        delete debugWindow.brocodeHideFeatureFlags;
       }
     };
   }, []);
@@ -5098,7 +5098,7 @@ export default function Sidebar() {
             toastManager.add({
               type: "info",
               title: "You're up to date",
-              description: `DP Code ${nextState.currentVersion} is already the newest version.`,
+              description: `BroCode ${nextState.currentVersion} is already the newest version.`,
             });
             return;
           }

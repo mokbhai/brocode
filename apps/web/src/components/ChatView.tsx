@@ -7816,11 +7816,11 @@ export default function ChatView({
                 <div className="flex w-full max-w-3xl flex-col justify-center">
                   <div className="flex flex-col items-center gap-4 px-6 pb-5 text-center select-none">
                     <img
-                      alt="DP Code logo"
+                      alt="BroCode logo"
                       className="size-12 rounded-lg object-contain"
                       draggable={false}
                       height={96}
-                      src="/dpcode-hero.png"
+                      src="/brocode-hero.png"
                       width={96}
                     />
                     <h2 className="text-[26px] font-normal leading-[1.15] tracking-[-0.015em] text-foreground/95 sm:text-[30px]">

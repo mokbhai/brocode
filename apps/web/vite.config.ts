@@ -22,7 +22,7 @@ const buildSourcemap =
 export default defineConfig({
   plugins: [
     {
-      name: "dpcode-tauri-entry",
+      name: "brocode-tauri-entry",
       transformIndexHtml(html) {
         if (!useTauriEntry) return html;
 
@@ -59,7 +59,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "dpcode-web-entry": webEntry,
+      "brocode-web-entry": webEntry,
     },
     tsconfigPaths: true,
   },

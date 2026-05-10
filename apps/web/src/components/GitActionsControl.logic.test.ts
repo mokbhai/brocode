@@ -1211,32 +1211,32 @@ describe("resolveAutoFeatureBranchName", () => {
 });
 
 describe("resolveDefaultCreateBranchName", () => {
-  it("uses dpcode as the default namespace", () => {
+  it("uses brocode as the default namespace", () => {
     const branch = resolveDefaultCreateBranchName(["main"], "fix toast copy");
-    assert.equal(branch, "dpcode/fix-toast-copy");
+    assert.equal(branch, "brocode/fix-toast-copy");
   });
 
-  it("keeps an existing dpcode namespace", () => {
-    const branch = resolveDefaultCreateBranchName(["main"], "dpcode/refine-toolbar-actions");
-    assert.equal(branch, "dpcode/refine-toolbar-actions");
+  it("keeps an existing brocode namespace", () => {
+    const branch = resolveDefaultCreateBranchName(["main"], "brocode/refine-toolbar-actions");
+    assert.equal(branch, "brocode/refine-toolbar-actions");
   });
 
-  it("preserves nested namespaces under dpcode", () => {
+  it("preserves nested namespaces under brocode", () => {
     const branch = resolveDefaultCreateBranchName(["main"], "feature/refine-toolbar-actions");
-    assert.equal(branch, "dpcode/feature/refine-toolbar-actions");
+    assert.equal(branch, "brocode/feature/refine-toolbar-actions");
   });
 
-  it("increments suffix when the dpcode branch already exists", () => {
+  it("increments suffix when the brocode branch already exists", () => {
     const branch = resolveDefaultCreateBranchName(
-      ["main", "dpcode/fix-toast-copy", "dpcode/fix-toast-copy-2"],
+      ["main", "brocode/fix-toast-copy", "brocode/fix-toast-copy-2"],
       "fix toast copy",
     );
-    assert.equal(branch, "dpcode/fix-toast-copy-3");
+    assert.equal(branch, "brocode/fix-toast-copy-3");
   });
 
-  it("falls back to dpcode/update when no preferred name is provided", () => {
+  it("falls back to brocode/update when no preferred name is provided", () => {
     const branch = resolveDefaultCreateBranchName(["main"]);
-    assert.equal(branch, "dpcode/update");
+    assert.equal(branch, "brocode/update");
   });
 });
 
@@ -1244,7 +1244,7 @@ describe("resolveLiveThreadBranchUpdate", () => {
   it("does not regress a semantic thread branch back to a temporary worktree branch", () => {
     const update = resolveLiveThreadBranchUpdate({
       threadBranch: "feature/semantic-branch",
-      gitStatus: status({ branch: "dpcode/deadbeef" }),
+      gitStatus: status({ branch: "brocode/deadbeef" }),
     });
 
     assert.equal(update, null);
@@ -1261,7 +1261,7 @@ describe("resolveLiveThreadBranchUpdate", () => {
 });
 
 describe("shouldOfferCreateBranchPrompt", () => {
-  const temporaryBranch = "dpcode/deadbeef";
+  const temporaryBranch = "brocode/deadbeef";
 
   it("shows the create-branch prompt for temporary worktree branches without upstream", () => {
     assert.isTrue(

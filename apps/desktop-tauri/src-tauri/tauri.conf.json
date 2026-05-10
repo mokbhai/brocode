@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DP Code Tauri (POC)",
+  "productName": "BroCode Tauri (POC)",
   "version": "0.0.42",
-  "identifier": "com.t3tools.dpcode.tauri.dev",
+  "identifier": "com.t3tools.brocode.tauri.dev",
   "build": {
     "beforeDevCommand": {
       "script": "node scripts/run-web-with-tauri-entry.js run dev -- --host 127.0.0.1 --port 5733",
@@ -19,7 +19,7 @@
   "app": {
     "windows": [
       {
-        "title": "DP Code Tauri (POC)",
+        "title": "BroCode Tauri (POC)",
         "width": 1280,
         "height": 820,
         "minWidth": 960,

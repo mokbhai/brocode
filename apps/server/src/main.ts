@@ -95,6 +95,24 @@ export class CliConfig extends ServiceMap.Service<CliConfig, CliConfigShape>()(
 }
 
 const CliEnvConfig = Config.all({
+  broMode: Config.string("BROCODE_MODE").pipe(
+    Config.option,
+    Config.map(
+      Option.match<RuntimeMode | undefined, string>({
+        onNone: () => undefined,
+        onSome: (value) => (value === "desktop" ? "desktop" : "web"),
+      }),
+    ),
+  ),
+  dpMode: Config.string("DPCODE_MODE").pipe(
+    Config.option,
+    Config.map(
+      Option.match<RuntimeMode | undefined, string>({
+        onNone: () => undefined,
+        onSome: (value) => (value === "desktop" ? "desktop" : "web"),
+      }),
+    ),
+  ),
   mode: Config.string("T3CODE_MODE").pipe(
     Config.option,
     Config.map(
@@ -104,11 +122,33 @@ const CliEnvConfig = Config.all({
       }),
     ),
   ),
+  broPort: Config.port("BROCODE_PORT").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  dpPort: Config.port("DPCODE_PORT").pipe(Config.option, Config.map(Option.getOrUndefined)),
   port: Config.port("T3CODE_PORT").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  broHost: Config.string("BROCODE_HOST").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  dpHost: Config.string("DPCODE_HOST").pipe(Config.option, Config.map(Option.getOrUndefined)),
   host: Config.string("T3CODE_HOST").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  broHome: Config.string("BROCODE_HOME").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  dpHome: Config.string("DPCODE_HOME").pipe(Config.option, Config.map(Option.getOrUndefined)),
   t3Home: Config.string("T3CODE_HOME").pipe(Config.option, Config.map(Option.getOrUndefined)),
   devUrl: Config.url("VITE_DEV_SERVER_URL").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  broNoBrowser: Config.boolean("BROCODE_NO_BROWSER").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  dpNoBrowser: Config.boolean("DPCODE_NO_BROWSER").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
   noBrowser: Config.boolean("T3CODE_NO_BROWSER").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  broAuthToken: Config.string("BROCODE_AUTH_TOKEN").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  dpAuthToken: Config.string("DPCODE_AUTH_TOKEN").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
@@ -146,11 +186,17 @@ const ServerConfigLive = (input: CliInput) =>
         ),
       );
 
-      const mode = Option.getOrElse(input.mode, () => env.mode);
+      const mode = Option.getOrElse(input.mode, () => env.broMode ?? env.dpMode ?? env.mode);
 
       const port = yield* Option.match(input.port, {
         onSome: (value) => Effect.succeed(value),
         onNone: () => {
+          if (env.broPort) {
+            return Effect.succeed(env.broPort);
+          }
+          if (env.dpPort) {
+            return Effect.succeed(env.dpPort);
+          }
           if (env.port) {
             return Effect.succeed(env.port);
           }
@@ -162,8 +208,10 @@ const ServerConfigLive = (input: CliInput) =>
       });
 
       const devUrl = Option.getOrElse(input.devUrl, () => env.devUrl);
-      const baseDir = yield* resolveBaseDir(Option.getOrUndefined(input.t3Home) ?? env.t3Home);
-      // Import legacy ~/.t3 state before runtime paths are derived under ~/.dpcode.
+      const baseDir = yield* resolveBaseDir(
+        Option.getOrUndefined(input.t3Home) ?? env.broHome ?? env.dpHome ?? env.t3Home,
+      );
+      // Import legacy ~/.t3 state before runtime paths are derived under ~/.brocode.
       yield* migrateLegacyHomeIfNeeded({
         baseDir,
         homeDir: OS.homedir(),
@@ -178,8 +226,15 @@ const ServerConfigLive = (input: CliInput) =>
         ),
       );
       const derivedPaths = yield* deriveServerPaths(baseDir, devUrl);
-      const noBrowser = resolveBooleanFlag(input.noBrowser, env.noBrowser ?? mode === "desktop");
-      const authToken = Option.getOrUndefined(input.authToken) ?? env.authToken;
+      const noBrowser = resolveBooleanFlag(
+        input.noBrowser,
+        env.broNoBrowser ?? env.dpNoBrowser ?? env.noBrowser ?? mode === "desktop",
+      );
+      const authToken =
+        Option.getOrUndefined(input.authToken) ??
+        env.broAuthToken ??
+        env.dpAuthToken ??
+        env.authToken;
       const autoBootstrapProjectFromCwd = resolveBooleanFlag(
         input.autoBootstrapProjectFromCwd,
         env.autoBootstrapProjectFromCwd ?? mode === "web",
@@ -199,6 +254,8 @@ const ServerConfigLive = (input: CliInput) =>
       const staticDir = devUrl ? undefined : yield* cliConfig.resolveStaticDir;
       const host =
         Option.getOrUndefined(input.host) ??
+        env.broHost ??
+        env.dpHost ??
         env.host ??
         (mode === "desktop" ? "127.0.0.1" : undefined);
 
@@ -286,7 +343,7 @@ const makeServerProgram = (input: CliInput) =>
         ? `http://${formatHostForUrl(config.host)}:${config.port}`
         : localUrl;
     const { authToken, devUrl, ...safeConfig } = config;
-    yield* Effect.logInfo("DP Code running", {
+    yield* Effect.logInfo("BroCode running", {
       ...safeConfig,
       devUrl: devUrl?.toString(),
       authEnabled: Boolean(authToken),
@@ -324,7 +381,7 @@ const hostFlag = Flag.string("host").pipe(
   Flag.optional,
 );
 const t3HomeFlag = Flag.string("home-dir").pipe(
-  Flag.withDescription("Base directory for all DP Code data (equivalent to T3CODE_HOME)."),
+  Flag.withDescription("Base directory for all BroCode data (equivalent to T3CODE_HOME)."),
   Flag.optional,
 );
 const devUrlFlag = Flag.string("dev-url").pipe(
@@ -373,6 +430,6 @@ export const t3Cli = Command.make("t3", {
   logProviderEvents: logProviderEventsFlag,
   logWebSocketEvents: logWebSocketEventsFlag,
 }).pipe(
-  Command.withDescription("Run the DP Code server."),
+  Command.withDescription("Run the BroCode server."),
   Command.withHandler((input) => Effect.scoped(makeServerProgram(input))),
 );

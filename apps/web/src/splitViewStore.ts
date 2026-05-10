@@ -112,11 +112,11 @@ interface SplitViewStore {
   setHasHydrated: (hasHydrated: boolean) => void;
 }
 
-// Keep the v1 suffix stable while using the DPCode namespace; the legacy
+// Keep the v1 suffix stable while using the BroCode namespace; the legacy
 // `t3code:split-view-state:v1` key is copied over to this one by
 // `storageKeyMigration` before this store hydrates, so older payloads still
 // flow through the v1 -> v2 schema migration below.
-const SPLIT_VIEW_STORAGE_KEY = "dpcode:split-view-state:v1";
+const SPLIT_VIEW_STORAGE_KEY = "brocode:split-view-state:v1";
 const SPLIT_VIEW_STORAGE_VERSION = 2;
 const DEFAULT_RATIO = 0.5;
 const MIN_RATIO = 0.25;

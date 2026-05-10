@@ -1,8 +1,8 @@
 # Keybindings
 
-DP Code reads keybindings from:
+BroCode reads keybindings from:
 
-- `~/.dpcode/userdata/keybindings.json`
+- `~/.brocode/userdata/keybindings.json`
 
 The file must be a JSON array of rules:
 

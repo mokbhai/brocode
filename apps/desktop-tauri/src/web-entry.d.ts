@@ -1,1 +1,1 @@
-declare module "dpcode-web-entry" {}
+declare module "brocode-web-entry" {}

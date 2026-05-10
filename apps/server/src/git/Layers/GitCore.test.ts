@@ -823,7 +823,7 @@ it.layer(TestLayer)("git integration", (it) => {
 
         const stashList = yield* git(tmp, ["stash", "list"]);
         expect(stashList).toContain("pre-existing stash");
-        expect(stashList).not.toContain("dpcode: stash before switching to feature");
+        expect(stashList).not.toContain("brocode: stash before switching to feature");
         expect(yield* readTextFile(path.join(tmp, "README.md"))).toBe("dirty changes\n");
       }),
     );
@@ -853,7 +853,7 @@ it.layer(TestLayer)("git integration", (it) => {
         expect(yield* readTextFile(path.join(tmp, "README.md"))).toBe("conflicting content\n");
         expect((yield* git(tmp, ["status", "--short"])).trim()).toBe("");
         expect(yield* git(tmp, ["stash", "list"])).toContain(
-          "dpcode: stash before switching to conflicting",
+          "brocode: stash before switching to conflicting",
         );
       }),
     );

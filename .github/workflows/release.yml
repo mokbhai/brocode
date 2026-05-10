@@ -247,7 +247,7 @@ jobs:
 
   publish_cli:
     name: Publish CLI to npm
-    if: ${{ vars.DPCODE_PUBLISH_CLI == '1' }}
+    if: ${{ vars.BROCODE_PUBLISH_CLI == '1' }}
     needs: [preflight, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -315,7 +315,7 @@ jobs:
         with:
           tag_name: ${{ needs.preflight.outputs.tag }}
           target_commitish: ${{ needs.preflight.outputs.ref }}
-          name: DP Code v${{ needs.preflight.outputs.version }}
+          name: BroCode v${{ needs.preflight.outputs.version }}
           generate_release_notes: true
           prerelease: ${{ needs.preflight.outputs.is_prerelease }}
           make_latest: ${{ needs.preflight.outputs.make_latest }}
@@ -330,7 +330,7 @@ jobs:
 
   finalize:
     name: Finalize release
-    if: ${{ vars.DPCODE_FINALIZE_RELEASE == '1' }}
+    if: ${{ vars.BROCODE_FINALIZE_RELEASE == '1' }}
     needs: [preflight, release]
     runs-on: ubuntu-24.04
     timeout-minutes: 10

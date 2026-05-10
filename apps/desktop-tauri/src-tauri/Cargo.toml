@@ -1,7 +1,7 @@
 [package]
-name = "dpcode_desktop_tauri"
+name = "brocode_desktop_tauri"
 version = "0.0.42"
-description = "DP Code Tauri desktop shell proof of concept"
+description = "BroCode Tauri desktop shell proof of concept"
 edition = "2021"
 
 [build-dependencies]

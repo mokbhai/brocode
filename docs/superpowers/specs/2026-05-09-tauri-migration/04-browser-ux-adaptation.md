@@ -26,22 +26,22 @@ It should show:
 - button to focus or open the controlled browser window
 - warning state when automation is attached to an existing debug browser
 
-The actual browser page should run in the external Chromium-family browser. This keeps DP Code lightweight and avoids embedding another heavy browser surface.
+The actual browser page should run in the external Chromium-family browser. This keeps BroCode lightweight and avoids embedding another heavy browser surface.
 
 ## Interaction Model
 
 Default isolated mode:
 
-- opening the browser feature launches or focuses the isolated DP Code browser window
-- DP Code panel mirrors the active tab state
+- opening the browser feature launches or focuses the isolated BroCode browser window
+- BroCode panel mirrors the active tab state
 - browser-use automation operates on the same controlled browser
 - screenshots can be inserted into prompts from the panel
 
 Existing debug endpoint mode:
 
-- DP Code connects to the configured endpoint
+- BroCode connects to the configured endpoint
 - the panel shows which endpoint is connected
-- the panel avoids implying that DP Code owns the browser process
+- the panel avoids implying that BroCode owns the browser process
 - disconnect is explicit
 
 ## Web App Changes
@@ -68,7 +68,7 @@ This lets Electron remain functional during migration while Tauri uses the exter
 - the Tauri app does not render an Electron `<webview>`
 - browser controls still support navigation, tabs, screenshots, and prompt attachment workflows
 - browser-use requests can open or focus the browser panel/status surface
-- users can understand whether DP Code launched an isolated browser or connected to an existing endpoint
+- users can understand whether BroCode launched an isolated browser or connected to an existing endpoint
 - browser errors are visible without freezing or blanking the chat UI
 
 ## Test Strategy

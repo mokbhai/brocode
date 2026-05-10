@@ -211,12 +211,12 @@ export function getGeminiThinkingModelAlias(
 
   const base = sanitizeGeminiAliasSegment(model);
   if (kind === "level" && nextOptions.thinkingLevel) {
-    return `dpcode-gemini-${base}-thinking-level-${nextOptions.thinkingLevel.toLowerCase()}`;
+    return `brocode-gemini-${base}-thinking-level-${nextOptions.thinkingLevel.toLowerCase()}`;
   }
   if (kind === "budget" && nextOptions.thinkingBudget !== undefined) {
     const budget =
       nextOptions.thinkingBudget === -1 ? "dynamic" : String(nextOptions.thinkingBudget);
-    return `dpcode-gemini-${base}-thinking-budget-${budget}`;
+    return `brocode-gemini-${base}-thinking-budget-${budget}`;
   }
   return null;
 }

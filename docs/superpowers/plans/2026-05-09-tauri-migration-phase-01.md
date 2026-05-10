@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an experimental Tauri proof of concept that hosts the existing web UI, starts the existing backend, and exposes the minimal desktop bridge needed for a connected DP Code session.
+**Goal:** Build an experimental Tauri proof of concept that hosts the existing web UI, starts the existing backend, and exposes the minimal desktop bridge needed for a connected BroCode session.
 
 **Complete Target:** Replace the Electron desktop shell with a lower-memory Tauri/Rust shell while keeping the TypeScript web UI, TypeScript backend, and shared contracts; browser automation will move to an installed Chromium-family browser in later phases.
 
@@ -109,13 +109,13 @@ Add `apps/desktop-tauri/src-tauri/Cargo.toml`:
 
 ```toml
 [package]
-name = "dpcode_desktop_tauri"
+name = "brocode_desktop_tauri"
 version = "0.0.42"
-description = "DP Code Tauri desktop shell proof of concept"
+description = "BroCode Tauri desktop shell proof of concept"
 edition = "2021"
 
 [lib]
-name = "dpcode_desktop_tauri"
+name = "brocode_desktop_tauri"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -147,9 +147,9 @@ Add `apps/desktop-tauri/src-tauri/tauri.conf.json`. Use Tauri v2 `devUrl`/`front
 ```json
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DP Code Tauri (POC)",
+  "productName": "BroCode Tauri (POC)",
   "version": "0.0.42",
-  "identifier": "com.t3tools.dpcode.tauri.dev",
+  "identifier": "com.t3tools.brocode.tauri.dev",
   "build": {
     "beforeDevCommand": "bun run --cwd ../web dev -- --host 127.0.0.1",
     "beforeBuildCommand": "bun run --cwd ../web build",
@@ -159,7 +159,7 @@ Add `apps/desktop-tauri/src-tauri/tauri.conf.json`. Use Tauri v2 `devUrl`/`front
   "app": {
     "windows": [
       {
-        "title": "DP Code Tauri (POC)",
+        "title": "BroCode Tauri (POC)",
         "width": 1280,
         "height": 820,
         "minWidth": 960,
@@ -187,7 +187,7 @@ Add `apps/desktop-tauri/src-tauri/capabilities/default.json`:
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window permissions for the DP Code Tauri proof of concept.",
+  "description": "Main window permissions for the BroCode Tauri proof of concept.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -209,7 +209,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .run(tauri::generate_context!())
-        .expect("failed to run DP Code Tauri shell");
+        .expect("failed to run BroCode Tauri shell");
 }
 ```
 
@@ -290,7 +290,7 @@ mod tests {
         let config = BackendConfig {
             port: 58090,
             host: "127.0.0.1".to_string(),
-            home_dir: ".dpcode-tauri-dev".into(),
+            home_dir: ".brocode-tauri-dev".into(),
             repo_root: "/repo".into(),
         };
 
@@ -377,14 +377,14 @@ pub async fn start_backend(state: SharedBackendState, config: BackendConfig) -> 
         .env("T3CODE_HOST", &config.host)
         .env("T3CODE_PORT", config.port.to_string())
         .env("T3CODE_HOME", &config.home_dir)
-        .env("DPCODE_HOME", &config.home_dir)
+        .env("BROCODE_HOME", &config.home_dir)
         .env("T3CODE_NO_BROWSER", "1")
         .env_remove("T3CODE_AUTH_TOKEN")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
 
     let child = command.spawn().map_err(|error| {
-        BridgeError::new(format!("Failed to start DP Code backend: {error}"))
+        BridgeError::new(format!("Failed to start BroCode backend: {error}"))
     })?;
 
     *guard = Some(child);
@@ -447,7 +447,7 @@ pub fn repo_root() -> Result<PathBuf, BridgeError> {
 }
 
 pub fn default_dev_home(repo_root: &std::path::Path) -> PathBuf {
-    repo_root.join(".dpcode-tauri-dev")
+    repo_root.join(".brocode-tauri-dev")
 }
 ```
 
@@ -480,7 +480,7 @@ fn main() {
                     .and_then(|value| value.parse::<u16>().ok())
                     .unwrap_or(58090),
                 host: "127.0.0.1".to_string(),
-                home_dir: std::env::var("DPCODE_HOME")
+                home_dir: std::env::var("BROCODE_HOME")
                     .map(std::path::PathBuf::from)
                     .unwrap_or_else(|_| paths::default_dev_home(&repo_root)),
                 repo_root,
@@ -503,7 +503,7 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("failed to run DP Code Tauri shell");
+        .expect("failed to run BroCode Tauri shell");
 }
 ```
 
@@ -791,7 +791,7 @@ If script tests exist, add a case that `dev:desktop-tauri` sets:
 T3CODE_MODE=desktop
 T3CODE_NO_BROWSER=1
 T3CODE_HOME=<configured isolated home>
-DPCODE_HOME=<configured isolated home>
+BROCODE_HOME=<configured isolated home>
 PORT=<web port>
 T3CODE_PORT=<server port>
 ```
@@ -832,14 +832,14 @@ Ensure root `package.json` includes:
 Run:
 
 ```bash
-env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.dpcode-tauri-dev --port 58090 --dry-run
+env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.brocode-tauri-dev --port 58090 --dry-run
 ```
 
 Expected:
 
 - no process starts
 - output shows server port `58090`
-- output shows isolated home `./.dpcode-tauri-dev`
+- output shows isolated home `./.brocode-tauri-dev`
 - output does not inherit `T3CODE_AUTH_TOKEN`
 
 - [ ] **Step 5: Commit**
@@ -860,22 +860,22 @@ git commit -m "Add isolated Tauri desktop dev mode"
 Create `apps/desktop-tauri/README.md`:
 
 ```md
-# DP Code Tauri Proof Of Concept
+# BroCode Tauri Proof Of Concept
 
-This package is an experimental Tauri shell for DP Code. It exists to validate a lower-memory desktop runtime while the Electron app remains supported.
+This package is an experimental Tauri shell for BroCode. It exists to validate a lower-memory desktop runtime while the Electron app remains supported.
 
 ## Development
 
 Run a dry run first:
 
 ```bash
-env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.dpcode-tauri-dev --port 58090 --dry-run
+env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.brocode-tauri-dev --port 58090 --dry-run
 ```
 
 Start the Tauri proof of concept:
 
 ```bash
-env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.dpcode-tauri-dev --port 58090
+env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.brocode-tauri-dev --port 58090
 ```
 
 Phase 1 supports backend startup, WebSocket connection, and a minimal desktop bridge. Browser automation, updater behavior, and full native menu parity are later migration phases.
@@ -902,7 +902,7 @@ Status: Phase 1 proof of concept complete; Phase 2 is next.
 Run:
 
 ```bash
-env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.dpcode-tauri-dev --port 58090
+env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.brocode-tauri-dev --port 58090
 ```
 
 Expected:

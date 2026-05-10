@@ -2,11 +2,11 @@ use std::path::{Path, PathBuf};
 
 pub fn repo_root_from_manifest_dir() -> PathBuf {
     resolve_repo_root_from_manifest_dir(&PathBuf::from(env!("CARGO_MANIFEST_DIR")))
-        .expect("src-tauri should live under the DP Code repository")
+        .expect("src-tauri should live under the BroCode repository")
 }
 
 pub fn default_dev_home(repo_root: &Path) -> PathBuf {
-    repo_root.join(".dpcode-tauri-dev")
+    repo_root.join(".brocode-tauri-dev")
 }
 
 fn resolve_repo_root_from_manifest_dir(manifest_dir: &Path) -> Option<PathBuf> {
@@ -29,7 +29,7 @@ mod tests {
 
         assert_eq!(
             default_dev_home(&repo_root),
-            repo_root.join(".dpcode-tauri-dev")
+            repo_root.join(".brocode-tauri-dev")
         );
     }
 

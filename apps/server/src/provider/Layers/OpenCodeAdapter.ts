@@ -1832,7 +1832,7 @@ export function makeOpenCodeAdapterLive(options?: OpenCodeAdapterLiveOptions) {
                   resumedSessionId ??
                   (yield* runOpenCodeSdk("session.create", () =>
                     client.session.create({
-                      title: `DP Code ${input.threadId}`,
+                      title: `BroCode ${input.threadId}`,
                       ...(initialParsedModel
                         ? {
                             model: {
@@ -1994,7 +1994,7 @@ export function makeOpenCodeAdapterLive(options?: OpenCodeAdapterLiveOptions) {
 
         context.activeTurnId = turnId;
         context.activeInteractionMode = input.interactionMode === "plan" ? "plan" : "default";
-        // Always pin DP Code's interaction mode to OpenCode's primary agent.
+        // Always pin BroCode's interaction mode to OpenCode's primary agent.
         // Otherwise a user config with default agent=plan can trap default turns in plan mode.
         context.activeAgent =
           agent ?? (input.interactionMode === "plan" ? OPENCODE_PLAN_AGENT : OPENCODE_BUILD_AGENT);

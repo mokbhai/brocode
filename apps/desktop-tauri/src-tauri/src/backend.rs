@@ -116,12 +116,17 @@ pub async fn start_backend(state: BackendState, config: BackendConfig) -> Result
             .args(command_spec.args)
             .current_dir(command_spec.current_dir)
             .env("T3CODE_MODE", "desktop")
+            .env("BROCODE_MODE", "desktop")
             .env("T3CODE_HOST", &config.host)
             .env("T3CODE_PORT", config.port.to_string())
+            .env("BROCODE_PORT", config.port.to_string())
             .env("T3CODE_HOME", &home_dir)
+            .env("BROCODE_HOME", &home_dir)
             .env("DPCODE_HOME", &home_dir)
             .env("T3CODE_NO_BROWSER", "1")
+            .env("BROCODE_NO_BROWSER", "1")
             .env_remove("T3CODE_AUTH_TOKEN")
+            .env_remove("BROCODE_AUTH_TOKEN")
             .stdin(Stdio::null())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
@@ -337,7 +342,7 @@ mod tests {
         let config = BackendConfig {
             port: 58090,
             host: "127.0.0.1".to_string(),
-            home_dir: PathBuf::from(".dpcode-tauri-dev"),
+            home_dir: PathBuf::from(".brocode-tauri-dev"),
             repo_root: PathBuf::from("."),
         };
 
@@ -359,13 +364,13 @@ mod tests {
         let config = BackendConfig {
             port: 58090,
             host: "127.0.0.1".to_string(),
-            home_dir: PathBuf::from("/tmp/dpcode-home"),
-            repo_root: PathBuf::from("/tmp/dpcode"),
+            home_dir: PathBuf::from("/tmp/brocode-home"),
+            repo_root: PathBuf::from("/tmp/brocode"),
         };
 
         let command = backend_command_spec(&config);
 
-        assert_eq!(command.current_dir, PathBuf::from("/tmp/dpcode"));
+        assert_eq!(command.current_dir, PathBuf::from("/tmp/brocode"));
         assert_eq!(command.args, ["run", "--cwd", "apps/server", "dev"]);
     }
 
