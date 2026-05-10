@@ -17,7 +17,7 @@ Current desktop testing has been performed on macOS Tahoe, version 26.4.1.
 
 You can also just install the desktop app. It's cooler.
 
-Install the [desktop app from the Releases page](https://github.com/Emanuele-web04/brocode/releases)
+Install the [desktop app from the Releases page](https://github.com/mokbhai/brocode/releases)
 
 ## Some notes
 

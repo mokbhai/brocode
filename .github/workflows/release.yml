@@ -1,4 +1,4 @@
-name: Release Desktop
+name: Release Electron Desktop
 
 on:
   push:

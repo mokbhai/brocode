@@ -192,6 +192,7 @@ interface StagePackageJson {
   readonly name: string;
   readonly version: string;
   readonly buildVersion: string;
+  readonly brocodeCommitHash: string;
   readonly t3codeCommitHash: string;
   readonly private: true;
   readonly description: string;
@@ -488,6 +489,8 @@ function resolveGitHubPublishConfig():
     }
   | undefined {
   const rawRepo =
+    process.env.BROCODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
+    process.env.DPCODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
     process.env.T3CODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
     process.env.GITHUB_REPOSITORY?.trim() ||
     "";
@@ -516,7 +519,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   const buildConfig: Record<string, unknown> = {
     appId: "com.t3tools.brocode",
     productName,
-    artifactName: "DP-Code-${version}-${arch}.${ext}",
+    artifactName: "BroCode-${version}-${arch}.${ext}",
     directories: {
       buildResources: "apps/desktop/resources",
     },
@@ -714,9 +717,10 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   yield* fs.copy(stageResourcesDir, path.join(stageAppDir, "apps/desktop/prod-resources"));
 
   const stagePackageJson: StagePackageJson = {
-    name: "dp-code-desktop",
+    name: "brocode-desktop",
     version: appVersion,
     buildVersion: appVersion,
+    brocodeCommitHash: commitHash,
     t3codeCommitHash: commitHash,
     private: true,
     description: "BroCode desktop build",
