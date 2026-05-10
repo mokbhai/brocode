@@ -67,6 +67,7 @@ Create a new experimental app instead of replacing `apps/desktop` immediately:
 ## Task 1: Add Workspace Package And Tauri Skeleton
 
 **Files:**
+
 - Create: `apps/desktop-tauri/package.json`
 - Create: `apps/desktop-tauri/src-tauri/Cargo.toml`
 - Create: `apps/desktop-tauri/src-tauri/build.rs`
@@ -189,11 +190,7 @@ Add `apps/desktop-tauri/src-tauri/capabilities/default.json`:
   "identifier": "default",
   "description": "Main window permissions for the BroCode Tauri proof of concept.",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "dialog:default",
-    "opener:default"
-  ]
+  "permissions": ["core:default", "dialog:default", "opener:default"]
 }
 ```
 
@@ -271,6 +268,7 @@ git commit -m "Add Tauri desktop proof of concept shell"
 ## Task 2: Add Backend Process Supervisor
 
 **Files:**
+
 - Create: `apps/desktop-tauri/src-tauri/src/backend.rs`
 - Create: `apps/desktop-tauri/src-tauri/src/paths.rs`
 - Modify: `apps/desktop-tauri/src-tauri/src/main.rs`
@@ -529,6 +527,7 @@ git commit -m "Start backend from Tauri shell"
 ## Task 3: Implement Minimal Tauri Desktop Bridge
 
 **Files:**
+
 - Create: `apps/desktop-tauri/src-tauri/src/bridge.rs`
 - Modify: `apps/desktop-tauri/src-tauri/src/main.rs`
 - Modify: `apps/desktop-tauri/src-tauri/Cargo.toml`
@@ -634,7 +633,12 @@ Create `apps/desktop-tauri/src/desktopBridge.ts`:
 
 ```ts
 import { invoke } from "@tauri-apps/api/core";
-import type { DesktopBridge, DesktopUpdateState, ThreadBrowserState, ThreadId } from "@t3tools/contracts";
+import type {
+  DesktopBridge,
+  DesktopUpdateState,
+  ThreadBrowserState,
+  ThreadId,
+} from "@t3tools/contracts";
 
 let resolvedWsUrl: string | null = null;
 
@@ -779,6 +783,7 @@ git commit -m "Expose minimal Tauri desktop bridge"
 ## Task 4: Add Isolated Dev Runner Mode
 
 **Files:**
+
 - Modify: `scripts/dev-runner.ts`
 - Test: existing tests if present, otherwise add focused tests near `scripts/dev-runner.ts` only if the repo already has a test pattern for scripts
 - Modify: `package.json`
@@ -852,6 +857,7 @@ git commit -m "Add isolated Tauri desktop dev mode"
 ## Task 5: Manual Smoke Test And Phase 1 Notes
 
 **Files:**
+
 - Create: `apps/desktop-tauri/README.md`
 - Modify: `docs/superpowers/specs/2026-05-09-tauri-migration/00-overview.md`
 
@@ -859,7 +865,7 @@ git commit -m "Add isolated Tauri desktop dev mode"
 
 Create `apps/desktop-tauri/README.md`:
 
-```md
+````md
 # BroCode Tauri Proof Of Concept
 
 This package is an experimental Tauri shell for BroCode. It exists to validate a lower-memory desktop runtime while the Electron app remains supported.
@@ -871,6 +877,7 @@ Run a dry run first:
 ```bash
 env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --home-dir ./.brocode-tauri-dev --port 58090 --dry-run
 ```
+````
 
 Start the Tauri proof of concept:
 
@@ -879,7 +886,8 @@ env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=3158 bun run dev:desktop-tauri -- --
 ```
 
 Phase 1 supports backend startup, WebSocket connection, and a minimal desktop bridge. Browser automation, updater behavior, and full native menu parity are later migration phases.
-```
+
+````
 
 - [ ] **Step 2: Update spec status**
 
@@ -889,7 +897,7 @@ Modify `docs/superpowers/specs/2026-05-09-tauri-migration/00-overview.md`:
 ## Current Status
 
 Status: Phase 1 implementation in progress.
-```
+````
 
 After the smoke test passes, update it to:
 

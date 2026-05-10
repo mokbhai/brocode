@@ -255,8 +255,7 @@ const CODEX_DISCOVERY_SESSION_IDLE_MS = 10 * 60 * 1000;
 const NODE_REPL_SANDBOX_ALLOWED_UNIX_SOCKETS = "NODE_REPL_SANDBOX_ALLOWED_UNIX_SOCKETS";
 const BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN_ENV =
   "BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN";
-const DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN_ENV =
-  "DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN";
+const DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN_ENV = "DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN";
 const BROCODE_CODEX_HOME_OVERLAY_DIR = "codex-home-overlay";
 const BROCODE_BROWSER_PLUGIN_CONFIG_HEADER = '[plugins."brocode-browser@local"]';
 
@@ -335,11 +334,13 @@ export function disableBroCodeBrowserPluginInCodexConfig(config: string): string
   return output.join("\n");
 }
 
-function resolveBroCodeCodexHomeOverlayPath(env: NodeJS.ProcessEnv, sourceHomePath: string): string {
+function resolveBroCodeCodexHomeOverlayPath(
+  env: NodeJS.ProcessEnv,
+  sourceHomePath: string,
+): string {
   const runtimeHome =
     env.BROCODE_HOME?.trim() || env.DPCODE_HOME?.trim() || env.T3CODE_HOME?.trim();
-  const overlayRoot =
-    runtimeHome || path.join(path.dirname(sourceHomePath), ".brocode", "runtime");
+  const overlayRoot = runtimeHome || path.join(path.dirname(sourceHomePath), ".brocode", "runtime");
   return path.join(overlayRoot, BROCODE_CODEX_HOME_OVERLAY_DIR);
 }
 
