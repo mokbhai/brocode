@@ -24,6 +24,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
+const rootPackageOverrides =
+  (rootPackageJson as { readonly overrides?: Record<string, unknown> }).overrides ?? {};
 
 const RepoRoot = Effect.service(Path.Path).pipe(
   Effect.flatMap((path) => path.fromFileUrl(new URL("..", import.meta.url))),
@@ -605,7 +607,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const resolvedOverrides = yield* Effect.try({
     try: () =>
       resolveCatalogDependencies(
-        rootPackageJson.overrides,
+        rootPackageOverrides,
         rootPackageJson.workspaces.catalog,
         "apps/desktop",
       ),
