@@ -63,11 +63,7 @@ import {
   parseCodexCliVersion,
 } from "./provider/codexCliVersion";
 import { isNonFatalCodexErrorMessage } from "./codexErrorClassification.ts";
-import {
-  resolveBaseCodexHomePath,
-  resolveDpCodeCodexHomeOverlayPath,
-  shouldDisableDpCodeBrowserPlugin,
-} from "./codexHomePaths.ts";
+import { resolveBaseCodexHomePath } from "./codexHomePaths.ts";
 import { transcribeVoiceWithChatGptSession } from "./voiceTranscription.ts";
 
 type PendingRequestKey = string;
@@ -276,10 +272,6 @@ export function resolveCodexBrowserUsePipePath(
   return (input.platform ?? process.platform) === "win32"
     ? String.raw`\\.\pipe\codex-browser-use`
     : "/tmp/codex-browser-use.sock";
-}
-
-function resolveBaseCodexHomePath(env: NodeJS.ProcessEnv, explicitHomePath?: string): string {
-  return explicitHomePath?.trim() || env.CODEX_HOME?.trim() || path.join(homedir(), ".codex");
 }
 
 function shouldDisableBroCodeBrowserPlugin(env: NodeJS.ProcessEnv): boolean {

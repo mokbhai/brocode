@@ -70,7 +70,7 @@ const runCli = (
         }),
       ),
     ),
-  );
+  ) as Effect.Effect<void, unknown, never>;
 };
 
 beforeEach(() => {
