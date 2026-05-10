@@ -23,6 +23,19 @@ export function createMemoryStorage(): StateStorage {
   };
 }
 
+export function getLocalStorageOrMemoryStorage(): StateStorage {
+  const storage = globalThis.localStorage;
+  if (
+    storage &&
+    typeof storage.getItem === "function" &&
+    typeof storage.setItem === "function" &&
+    typeof storage.removeItem === "function"
+  ) {
+    return storage;
+  }
+  return createMemoryStorage();
+}
+
 export function createDebouncedStorage(
   baseStorage: StateStorage,
   debounceMs: number = 300,

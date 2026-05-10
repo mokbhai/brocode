@@ -151,7 +151,9 @@ function withFakeCodexEnv<A, E, R>(
       const fs = yield* FileSystem.FileSystem;
       const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3code-codex-text-" });
       const binDir = yield* makeFakeCodexBinary(tempDir);
+      const codexHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3code-codex-home-" });
       const previousPath = process.env.PATH;
+      const previousCodexHome = process.env.CODEX_HOME;
       const previousOutput = process.env.T3_FAKE_CODEX_OUTPUT_B64;
       const previousExitCode = process.env.T3_FAKE_CODEX_EXIT_CODE;
       const previousStderr = process.env.T3_FAKE_CODEX_STDERR;
@@ -170,6 +172,7 @@ function withFakeCodexEnv<A, E, R>(
 
       yield* Effect.sync(() => {
         process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+        process.env.CODEX_HOME = codexHome;
         process.env.T3_FAKE_CODEX_OUTPUT_B64 = Buffer.from(input.output, "utf8").toString("base64");
         process.env.DPCODE_DISABLE_CODEX_DPCODE_BROWSER_PLUGIN = "0";
 
@@ -244,6 +247,7 @@ function withFakeCodexEnv<A, E, R>(
 
       return {
         previousPath,
+        previousCodexHome,
         previousOutput,
         previousExitCode,
         previousStderr,
@@ -264,6 +268,12 @@ function withFakeCodexEnv<A, E, R>(
     (previous) =>
       Effect.sync(() => {
         process.env.PATH = previous.previousPath;
+
+        if (previous.previousCodexHome === undefined) {
+          delete process.env.CODEX_HOME;
+        } else {
+          process.env.CODEX_HOME = previous.previousCodexHome;
+        }
 
         if (previous.previousOutput === undefined) {
           delete process.env.T3_FAKE_CODEX_OUTPUT_B64;
