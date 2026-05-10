@@ -16,6 +16,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { className, size = "default", unstyled = false, nativeInput = false, ...props },
   ref,
 ) {
+  const { style, ...nativeProps } = props;
   const inputClassName = cn(
     "font-system-ui h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-muted-foreground/72 sm:h-7.5 sm:leading-7.5 [transition:background-color_5000000s_ease-in-out_0s]",
     size === "sm" && "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
@@ -44,7 +45,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           data-slot="input"
           size={typeof size === "number" ? size : undefined}
           ref={ref}
-          {...props}
+          style={typeof style === "function" ? undefined : style}
+          {...nativeProps}
         />
       ) : (
         <InputPrimitive
