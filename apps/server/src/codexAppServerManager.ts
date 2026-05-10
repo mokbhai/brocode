@@ -10,7 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
@@ -63,6 +63,11 @@ import {
   parseCodexCliVersion,
 } from "./provider/codexCliVersion";
 import { isNonFatalCodexErrorMessage } from "./codexErrorClassification.ts";
+import {
+  resolveBaseCodexHomePath,
+  resolveDpCodeCodexHomeOverlayPath,
+  shouldDisableDpCodeBrowserPlugin,
+} from "./codexHomePaths.ts";
 import { transcribeVoiceWithChatGptSession } from "./voiceTranscription.ts";
 
 type PendingRequestKey = string;
