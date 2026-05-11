@@ -105,9 +105,11 @@ export const AppSettingsSchema = Schema.Struct({
   confirmTerminalTabClose: Schema.Boolean.pipe(withDefaults(() => true)),
   diffWordWrap: Schema.Boolean.pipe(withDefaults(() => false)),
   enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => false)),
+  enableCodexBrowserTool: Schema.Boolean.pipe(withDefaults(() => false)),
   enableNativeFontSmoothing: Schema.Boolean.pipe(withDefaults(getDefaultNativeFontSmoothing)),
   enableTaskCompletionToasts: Schema.Boolean.pipe(withDefaults(() => true)),
   enableSystemTaskCompletionNotifications: Schema.Boolean.pipe(withDefaults(() => true)),
+  legacyDataImportPromptDismissed: Schema.Boolean.pipe(withDefaults(() => false)),
   sidebarSide: SidebarSide.pipe(withDefaults(() => DEFAULT_SIDEBAR_SIDE)),
   sidebarProjectSortOrder: SidebarProjectSortOrder.pipe(
     withDefaults(() => DEFAULT_SIDEBAR_PROJECT_SORT_ORDER),
@@ -247,6 +249,7 @@ function serverSettingsToAppSettings(settings: ServerSettings): Partial<AppSetti
     cursorBinaryPath: settings.providers.cursor.binaryPath,
     defaultThreadEnvMode: settings.defaultThreadEnvMode,
     enableAssistantStreaming: settings.enableAssistantStreaming,
+    enableCodexBrowserTool: settings.enableCodexBrowserTool,
     geminiBinaryPath: settings.providers.gemini.binaryPath,
     openCodeBinaryPath: settings.providers.opencode.binaryPath,
     openCodeServerPassword: settings.providers.opencode.serverPassword,
@@ -274,6 +277,9 @@ function appSettingsPatchToServerSettingsPatch(patch: Partial<AppSettings>): Ser
 
   if (hasOwn(patch, "enableAssistantStreaming")) {
     serverPatch.enableAssistantStreaming = Boolean(patch.enableAssistantStreaming);
+  }
+  if (hasOwn(patch, "enableCodexBrowserTool")) {
+    serverPatch.enableCodexBrowserTool = Boolean(patch.enableCodexBrowserTool);
   }
   if (patch.defaultThreadEnvMode === "local" || patch.defaultThreadEnvMode === "worktree") {
     serverPatch.defaultThreadEnvMode = patch.defaultThreadEnvMode;
@@ -370,6 +376,7 @@ function buildInitialServerSettingsMigrationPatch(settings: AppSettings): Server
     "cursorBinaryPath",
     "defaultThreadEnvMode",
     "enableAssistantStreaming",
+    "enableCodexBrowserTool",
     "geminiBinaryPath",
     "openCodeBinaryPath",
     "openCodeServerPassword",
@@ -538,6 +545,7 @@ export function getProviderStartOptions(
     AppSettings,
     | "claudeBinaryPath"
     | "codexBinaryPath"
+    | "enableCodexBrowserTool"
     | "codexHomePath"
     | "cursorApiEndpoint"
     | "cursorBinaryPath"
@@ -548,11 +556,12 @@ export function getProviderStartOptions(
   >,
 ): ProviderStartOptions | undefined {
   const providerOptions: ProviderStartOptions = {
-    ...(settings.codexBinaryPath || settings.codexHomePath
+    ...(settings.codexBinaryPath || settings.codexHomePath || settings.enableCodexBrowserTool
       ? {
           codex: {
             ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
             ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
+            ...(settings.enableCodexBrowserTool ? { enableBrowserTool: true } : {}),
           },
         }
       : {}),

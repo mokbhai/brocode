@@ -36,6 +36,7 @@ import { usePreferredEditor } from "../../editorPreferences";
 import { useIsDisposableThread } from "~/hooks/useIsDisposableThread";
 import { ClaudeAI, CursorIcon, Gemini, OpenAI, OpenCodeIcon } from "../Icons";
 import { gitStatusQueryOptions } from "~/lib/gitReactQuery";
+import { OpenInPicker } from "./OpenInPicker";
 
 /** Width (px) below which collapsible header controls fold into the ellipsis menu. */
 const HEADER_COMPACT_BREAKPOINT = 480;
@@ -356,6 +357,14 @@ export const ChatHeader = memo(function ChatHeader({
             onAddScript={onAddProjectScript}
             onUpdateScript={onUpdateProjectScript}
             onDeleteScript={onDeleteProjectScript}
+          />
+        ) : null}
+
+        {!isDisposableThread && activeProjectName ? (
+          <OpenInPicker
+            keybindings={keybindings}
+            availableEditors={availableEditors}
+            openInCwd={openInCwd}
           />
         ) : null}
 

@@ -20,6 +20,7 @@ import {
 import { type ComposerImageAttachment, type DraftThreadState } from "../composerDraftStore";
 import { Schema } from "effect";
 import {
+  deriveDisplayedUserMessageState,
   filterTerminalContextsWithText,
   stripInlineTerminalContextPlaceholders,
   type TerminalContextDraft,
@@ -36,6 +37,117 @@ export const DISMISSED_PROVIDER_HEALTH_BANNERS_KEY = "brocode:dismissed-provider
 
 export const LastInvokedScriptByProjectSchema = Schema.Record(ProjectId, Schema.String);
 export const DismissedProviderHealthBannersSchema = Schema.Array(Schema.String);
+
+export interface ComposerInputHistoryState {
+  activeIndex: number | null;
+  draftBeforeHistory: string | null;
+}
+
+export interface ComposerInputHistoryNavigationResult {
+  handled: boolean;
+  nextPrompt: string;
+  nextState: ComposerInputHistoryState;
+}
+
+export const EMPTY_COMPOSER_INPUT_HISTORY_STATE: ComposerInputHistoryState = {
+  activeIndex: null,
+  draftBeforeHistory: null,
+};
+
+export function buildComposerInputHistory(messages: readonly ChatMessage[]): string[] {
+  const history: string[] = [];
+  for (const message of messages) {
+    if (message.role !== "user") {
+      continue;
+    }
+    if (message.source !== undefined && message.source !== "native") {
+      continue;
+    }
+    const inputText = deriveDisplayedUserMessageState(message.text, {
+      hideImageOnlyBootstrapPrompt: true,
+    }).copyText.trim();
+    if (inputText.length === 0) {
+      continue;
+    }
+    history.push(inputText);
+  }
+  return history;
+}
+
+export function shouldNavigateComposerInputHistory(input: {
+  key: "ArrowDown" | "ArrowUp";
+  prompt: string;
+  expandedCursor: number;
+  historyState: ComposerInputHistoryState;
+}): boolean {
+  if (input.historyState.activeIndex !== null) {
+    return true;
+  }
+  if (input.key !== "ArrowUp") {
+    return false;
+  }
+  const cursor = Math.max(0, Math.min(input.prompt.length, Math.floor(input.expandedCursor)));
+  return !input.prompt.slice(0, cursor).includes("\n");
+}
+
+export function resolveComposerInputHistoryNavigation(input: {
+  key: "ArrowDown" | "ArrowUp";
+  history: readonly string[];
+  currentPrompt: string;
+  state: ComposerInputHistoryState;
+}): ComposerInputHistoryNavigationResult {
+  if (input.history.length === 0) {
+    return {
+      handled: false,
+      nextPrompt: input.currentPrompt,
+      nextState: input.state,
+    };
+  }
+
+  if (input.key === "ArrowUp") {
+    const nextIndex =
+      input.state.activeIndex === null
+        ? input.history.length - 1
+        : Math.max(0, input.state.activeIndex - 1);
+    return {
+      handled: true,
+      nextPrompt: input.history[nextIndex] ?? input.currentPrompt,
+      nextState: {
+        activeIndex: nextIndex,
+        draftBeforeHistory:
+          input.state.activeIndex === null
+            ? input.currentPrompt
+            : input.state.draftBeforeHistory,
+      },
+    };
+  }
+
+  if (input.state.activeIndex === null) {
+    return {
+      handled: false,
+      nextPrompt: input.currentPrompt,
+      nextState: input.state,
+    };
+  }
+
+  if (input.state.activeIndex >= input.history.length - 1) {
+    return {
+      handled: true,
+      nextPrompt: input.state.draftBeforeHistory ?? "",
+      nextState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
+    };
+  }
+
+  const nextIndex = input.state.activeIndex + 1;
+  return {
+    handled: true,
+    nextPrompt: input.history[nextIndex] ?? input.currentPrompt,
+    nextState: {
+      activeIndex: nextIndex,
+      draftBeforeHistory: input.state.draftBeforeHistory,
+    },
+  };
+}
 
 export function buildLocalDraftThread(
   threadId: ThreadId,

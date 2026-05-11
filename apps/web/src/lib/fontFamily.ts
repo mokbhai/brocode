@@ -75,6 +75,10 @@ function normalizeSingleFontFamily(family: string): string {
   const trimmedFamily = family.trim();
   const lowerFamily = trimmedFamily.toLowerCase();
 
+  if (lowerFamily === "sans") {
+    return "sans-serif";
+  }
+
   if (
     trimmedFamily.startsWith('"') ||
     trimmedFamily.startsWith("'") ||

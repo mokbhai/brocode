@@ -390,6 +390,7 @@ function asString(value: unknown): string | undefined {
 
 export function buildCodexProcessEnv(
   input: {
+    readonly enableBrowserTool?: boolean;
     readonly env?: NodeJS.ProcessEnv;
     readonly homePath?: string;
     readonly platform?: NodeJS.Platform;
@@ -397,6 +398,11 @@ export function buildCodexProcessEnv(
   } = {},
 ): NodeJS.ProcessEnv {
   const baseEnv = { ...(input.env ?? process.env) };
+  if (input.enableBrowserTool === true) {
+    baseEnv[BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN_ENV] = "0";
+  } else if (input.enableBrowserTool === false) {
+    baseEnv[BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN_ENV] = "1";
+  }
   const overlayHomePath = shouldDisableBroCodeBrowserPlugin(baseEnv)
     ? prepareBroCodeCodexHomeOverlay({
         env: baseEnv,
@@ -903,15 +909,18 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
       const codexOptions = readCodexProviderOptions(input);
       const codexBinaryPath = codexOptions.binaryPath ?? "codex";
       const codexHomePath = codexOptions.homePath;
+      const enableBrowserTool = codexOptions.enableBrowserTool;
       this.assertSupportedCodexCliVersion({
         binaryPath: codexBinaryPath,
         cwd: resolvedCwd,
         ...(codexHomePath ? { homePath: codexHomePath } : {}),
+        enableBrowserTool,
       });
       const child = spawn(codexBinaryPath, ["app-server"], {
         cwd: resolvedCwd,
         env: buildCodexProcessEnv({
           ...(codexHomePath ? { homePath: codexHomePath } : {}),
+          enableBrowserTool,
         }),
         stdio: ["pipe", "pipe", "pipe"],
         shell: process.platform === "win32",
@@ -1521,15 +1530,18 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
       });
       const codexBinaryPath = codexOptions.binaryPath ?? "codex";
       const codexHomePath = codexOptions.homePath;
+      const enableBrowserTool = codexOptions.enableBrowserTool;
       this.assertSupportedCodexCliVersion({
         binaryPath: codexBinaryPath,
         cwd: resolvedCwd,
         ...(codexHomePath ? { homePath: codexHomePath } : {}),
+        enableBrowserTool,
       });
       const child = spawn(codexBinaryPath, ["app-server"], {
         cwd: resolvedCwd,
         env: buildCodexProcessEnv({
           ...(codexHomePath ? { homePath: codexHomePath } : {}),
+          enableBrowserTool,
         }),
         stdio: ["pipe", "pipe", "pipe"],
         shell: process.platform === "win32",
@@ -2716,6 +2728,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
   private assertSupportedCodexCliVersion(input: {
     readonly binaryPath: string;
     readonly cwd: string;
+    readonly enableBrowserTool?: boolean;
     readonly homePath?: string;
   }): void {
     assertSupportedCodexCliVersion(input);
@@ -3432,6 +3445,7 @@ function normalizeProviderThreadId(value: string | undefined): string | undefine
 
 function readCodexProviderOptions(input: CodexAppServerStartSessionInput): {
   readonly binaryPath?: string;
+  readonly enableBrowserTool?: boolean;
   readonly homePath?: string;
 } {
   const options = input.providerOptions?.codex;
@@ -3440,6 +3454,9 @@ function readCodexProviderOptions(input: CodexAppServerStartSessionInput): {
   }
   return {
     ...(options.binaryPath ? { binaryPath: options.binaryPath } : {}),
+    ...(typeof options.enableBrowserTool === "boolean"
+      ? { enableBrowserTool: options.enableBrowserTool }
+      : {}),
     ...(options.homePath ? { homePath: options.homePath } : {}),
   };
 }
@@ -3447,12 +3464,14 @@ function readCodexProviderOptions(input: CodexAppServerStartSessionInput): {
 function assertSupportedCodexCliVersion(input: {
   readonly binaryPath: string;
   readonly cwd: string;
+  readonly enableBrowserTool?: boolean;
   readonly homePath?: string;
 }): void {
   const result = spawnSync(input.binaryPath, ["--version"], {
     cwd: input.cwd,
     env: buildCodexProcessEnv({
       ...(input.homePath ? { homePath: input.homePath } : {}),
+      enableBrowserTool: input.enableBrowserTool,
     }),
     encoding: "utf8",
     shell: process.platform === "win32",

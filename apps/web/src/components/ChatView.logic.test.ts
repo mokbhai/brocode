@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   appendVoiceTranscriptToPrompt,
+  buildComposerInputHistory,
+  EMPTY_COMPOSER_INPUT_HISTORY_STATE,
   filterSidechatTranscriptMessages,
   type LocalDispatchSnapshot,
   deriveComposerSendState,
@@ -15,9 +17,11 @@ import {
   buildExpiredTerminalContextToastCopy,
   shouldAutoDeleteTerminalThreadOnLastClose,
   shouldConsumePendingCustomBinaryConfirmation,
+  shouldNavigateComposerInputHistory,
   shouldShowComposerModelBootstrapSkeleton,
   shouldStartActiveTurnLayoutGrace,
   shouldRenderTerminalWorkspace,
+  resolveComposerInputHistoryNavigation,
 } from "./ChatView.logic";
 
 describe("voice helpers", () => {
@@ -151,6 +155,130 @@ describe("voice helpers", () => {
       canStartVoiceNotes: false,
       showVoiceNotesControl: true,
     });
+  });
+});
+
+describe("composer input history", () => {
+  it("derives sent native user inputs from the visible transcript text", () => {
+    const messages = [
+      {
+        id: "assistant-1" as never,
+        role: "assistant",
+        text: "Done",
+        turnId: null,
+        streaming: false,
+        source: "native",
+        createdAt: "2026-05-02T10:00:00.000Z",
+      },
+      {
+        id: "user-imported" as never,
+        role: "user",
+        text: "Imported context",
+        turnId: null,
+        streaming: false,
+        source: "fork-import",
+        createdAt: "2026-05-02T10:01:00.000Z",
+      },
+      {
+        id: "user-native" as never,
+        role: "user",
+        text: "  Fix the failing check  ",
+        turnId: null,
+        streaming: false,
+        source: "native",
+        createdAt: "2026-05-02T10:02:00.000Z",
+      },
+      {
+        id: "user-legacy" as never,
+        role: "user",
+        text: "Legacy native message",
+        turnId: null,
+        streaming: false,
+        createdAt: "2026-05-02T10:03:00.000Z",
+      },
+    ] as const;
+
+    expect(buildComposerInputHistory(messages)).toEqual([
+      "Fix the failing check",
+      "Legacy native message",
+    ]);
+  });
+
+  it("walks backward through sent inputs and restores the draft when walking forward past newest", () => {
+    const history = ["first", "second", "third"];
+    const firstUp = resolveComposerInputHistoryNavigation({
+      key: "ArrowUp",
+      history,
+      currentPrompt: "unsent draft",
+      state: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
+    });
+
+    expect(firstUp).toEqual({
+      handled: true,
+      nextPrompt: "third",
+      nextState: {
+        activeIndex: 2,
+        draftBeforeHistory: "unsent draft",
+      },
+    });
+
+    const secondUp = resolveComposerInputHistoryNavigation({
+      key: "ArrowUp",
+      history,
+      currentPrompt: firstUp.nextPrompt,
+      state: firstUp.nextState,
+    });
+
+    expect(secondUp.nextPrompt).toBe("second");
+
+    const firstDown = resolveComposerInputHistoryNavigation({
+      key: "ArrowDown",
+      history,
+      currentPrompt: secondUp.nextPrompt,
+      state: secondUp.nextState,
+    });
+    const secondDown = resolveComposerInputHistoryNavigation({
+      key: "ArrowDown",
+      history,
+      currentPrompt: firstDown.nextPrompt,
+      state: firstDown.nextState,
+    });
+
+    expect(firstDown.nextPrompt).toBe("third");
+    expect(secondDown).toEqual({
+      handled: true,
+      nextPrompt: "unsent draft",
+      nextState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
+    });
+  });
+
+  it("leaves normal arrow navigation alone inside multiline drafts until history browsing starts", () => {
+    expect(
+      shouldNavigateComposerInputHistory({
+        key: "ArrowUp",
+        prompt: "line one\nline two",
+        expandedCursor: "line one\nline".length,
+        historyState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldNavigateComposerInputHistory({
+        key: "ArrowUp",
+        prompt: "line one\nline two",
+        expandedCursor: "line".length,
+        historyState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldNavigateComposerInputHistory({
+        key: "ArrowDown",
+        prompt: "line one",
+        expandedCursor: 0,
+        historyState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
+      }),
+    ).toBe(false);
   });
 });
 

@@ -282,6 +282,7 @@ import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { ChatHeader } from "./chat/ChatHeader";
 import { SidebarHeaderNavigationControls } from "./SidebarHeaderNavigationControls";
 import { SidebarHeaderTrigger } from "./ui/sidebar";
+import { ChatMascotImage } from "./chat/ChatEmptyStateHero";
 import { ChatTranscriptPane } from "./chat/ChatTranscriptPane";
 import { buildTurnDiffSummaryByAssistantMessageId } from "./chat/MessagesTimeline.logic";
 import { ComposerSlashStatusDialog } from "./chat/ComposerSlashStatusDialog";
@@ -327,9 +328,13 @@ import {
   shouldAutoDeleteTerminalThreadOnLastClose,
   buildExpiredTerminalContextToastCopy,
   buildLocalDraftThread,
+  buildComposerInputHistory,
   DISMISSED_PROVIDER_HEALTH_BANNERS_KEY,
   DismissedProviderHealthBannersSchema,
+  EMPTY_COMPOSER_INPUT_HISTORY_STATE,
   shouldRenderTerminalWorkspace,
+  resolveComposerInputHistoryNavigation,
+  shouldNavigateComposerInputHistory,
   cloneComposerImageForRetry,
   collectUserMessageBlobPreviewUrls,
   createLocalDispatchSnapshot,
@@ -903,6 +908,7 @@ export default function ChatView({
     useMemo(() => createProjectSelector(fallbackDraftProjectId), [fallbackDraftProjectId]),
   );
   const promptRef = useRef(prompt);
+  const composerInputHistoryStateRef = useRef(EMPTY_COMPOSER_INPUT_HISTORY_STATE);
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ExpandedImagePreview | null>(null);
   const [optimisticUserMessages, setOptimisticUserMessages] = useState<ChatMessage[]>([]);
@@ -2077,6 +2083,10 @@ export default function ChatView({
     attachmentPreviewHandoffByMessageId,
     optimisticUserMessages,
   ]);
+  const composerInputHistory = useMemo(
+    () => buildComposerInputHistory(timelineMessages),
+    [timelineMessages],
+  );
   const timelineEntries = useMemo(
     () =>
       deriveTimelineEntries(timelineMessages, activeThread?.proposedPlans ?? [], workLogEntries),
@@ -4010,6 +4020,7 @@ export default function ChatView({
 
   useEffect(() => {
     voiceTranscriptionRequestIdRef.current += 1;
+    composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
     voiceRecordingStartedAtRef.current = null;
     void cancelVoiceRecording();
     setIsVoiceTranscribing(false);
@@ -4897,6 +4908,7 @@ export default function ChatView({
 
   const clearComposerInput = useCallback(
     (threadId: ThreadId) => {
+      composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
       promptRef.current = "";
       clearComposerDraftContent(threadId);
       setSelectedComposerSkills([]);
@@ -6597,6 +6609,7 @@ export default function ChatView({
 
   const setComposerPromptValue = useCallback(
     (nextPrompt: string) => {
+      composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
       promptRef.current = nextPrompt;
       setPrompt(nextPrompt);
       const nextCursor = collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
@@ -6610,7 +6623,23 @@ export default function ChatView({
     [setPrompt],
   );
 
+  const setComposerInputHistoryPromptValue = useCallback(
+    (nextPrompt: string) => {
+      promptRef.current = nextPrompt;
+      setPrompt(nextPrompt);
+      const nextCursor = collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
+      setComposerCursor(nextCursor);
+      setComposerTrigger(null);
+      setComposerHighlightedItemId(null);
+      window.requestAnimationFrame(() => {
+        composerEditorRef.current?.focusAt(nextCursor);
+      });
+    },
+    [setPrompt],
+  );
+
   const clearComposerSlashDraft = useCallback(() => {
+    composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
     promptRef.current = "";
     clearComposerDraftContent(threadId);
     setComposerHighlightedItemId(null);
@@ -6857,6 +6886,7 @@ export default function ChatView({
       terminalContextIds: string[],
     ) => {
       if (activePendingProgress?.activeQuestion && activePendingUserInput) {
+        composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
         onChangeActivePendingUserInputCustomAnswer(
           activePendingProgress.activeQuestion.id,
           nextPrompt,
@@ -6866,6 +6896,7 @@ export default function ChatView({
         );
         return;
       }
+      composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
       promptRef.current = nextPrompt;
       setPrompt(nextPrompt);
       if (composerCommandPicker !== null && nextPrompt.trim().length > 0) {
@@ -6918,8 +6949,10 @@ export default function ChatView({
       return true;
     }
 
-    const { trigger } = resolveActiveComposerTrigger();
-    const menuIsActive = composerMenuOpenRef.current || trigger !== null;
+    const { snapshot, trigger } = resolveActiveComposerTrigger();
+    const isComposerInputHistoryActive = composerInputHistoryStateRef.current.activeIndex !== null;
+    const menuIsActive =
+      !isComposerInputHistoryActive && (composerMenuOpenRef.current || trigger !== null);
 
     if (menuIsActive && isLocalFolderBrowserOpen) {
       if (key === "ArrowDown") {
@@ -6952,6 +6985,31 @@ export default function ChatView({
           onSelectComposerItem(selectedItem);
           return true;
         }
+      }
+    }
+
+    if (
+      (key === "ArrowUp" || key === "ArrowDown") &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      shouldNavigateComposerInputHistory({
+        key,
+        prompt: snapshot.value,
+        expandedCursor: snapshot.expandedCursor,
+        historyState: composerInputHistoryStateRef.current,
+      })
+    ) {
+      const navigation = resolveComposerInputHistoryNavigation({
+        key,
+        history: composerInputHistory,
+        currentPrompt: snapshot.value,
+        state: composerInputHistoryStateRef.current,
+      });
+      if (navigation.handled) {
+        composerInputHistoryStateRef.current = navigation.nextState;
+        setComposerInputHistoryPromptValue(navigation.nextPrompt);
+        return true;
       }
     }
 
@@ -7814,13 +7872,9 @@ export default function ChatView({
               <div className="chat-pane-enter flex flex-1 items-center justify-center px-3 sm:px-5">
                 <div className="flex w-full max-w-3xl flex-col justify-center">
                   <div className="flex flex-col items-center gap-4 px-6 pb-5 text-center select-none">
-                    <img
-                      alt="BroCode logo"
-                      className="size-12 rounded-lg object-contain"
-                      draggable={false}
-                      height={96}
-                      src="/brocode-hero.png"
-                      width={96}
+                    <ChatMascotImage
+                      className="size-[72px] object-contain"
+                      intrinsicSizePx={144}
                     />
                     <h2 className="text-[26px] font-normal leading-[1.15] tracking-[-0.015em] text-foreground/95 sm:text-[30px]">
                       {isEmptyChatLanding ? (

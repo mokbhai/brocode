@@ -6,10 +6,12 @@
 import {
   type ProviderKind,
   type ProjectId,
+  type ResolvedKeybindingsConfig,
   ThreadId,
   type ThreadId as ThreadIdType,
   type TurnId,
 } from "@t3tools/contracts";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Suspense,
@@ -28,6 +30,7 @@ import { Schema } from "effect";
 
 import ChatView from "../components/ChatView";
 import BrowserPanel from "../components/BrowserPanel";
+import { shouldRenderTerminalWorkspace } from "../components/ChatView.logic";
 import { ClaudeAI, CursorIcon, Gemini, OpenAI, OpenCodeIcon } from "../components/Icons";
 import { ChatPaneDropOverlay } from "../components/chat-drop-overlay/ChatPaneDropOverlay";
 import { DiffWorkerPoolProvider } from "../components/DiffWorkerPoolProvider";
@@ -46,10 +49,14 @@ import {
 } from "../diffRouteSearch";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useHandleNewChat } from "../hooks/useHandleNewChat";
+import { resolveShortcutCommand } from "../keybindings";
+import { serverConfigQueryOptions } from "../lib/serverReactQuery";
+import { isTerminalFocused } from "../lib/terminalFocus";
 import { resolveActiveSplitView, isSplitRoute } from "../splitViewRoute";
 import { canSubdividePane, collectLeaves, findLeafPaneById } from "../splitView.logic";
 import {
   resolveSplitViewFocusedThreadId,
+  resolveSplitViewFocusedPaneThreadId,
   resolveSplitViewPaneIdForThread,
   resolveSplitViewThreadIds,
   selectSplitView,
@@ -70,6 +77,7 @@ import {
   createThreadExistsSelector,
   createThreadProjectIdSelector,
 } from "../storeSelectors";
+import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { Button } from "../components/ui/button";
 import {
   Dialog,
@@ -93,6 +101,7 @@ import { cn } from "~/lib/utils";
 import { Sidebar, SidebarInset, SidebarProvider, SidebarRail } from "~/components/ui/sidebar";
 
 const DiffPanel = lazy(() => import("../components/DiffPanel"));
+const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
 const DIFF_INLINE_LAYOUT_MEDIA_QUERY = "(max-width: 1180px)";
 // Keep the inline diff visually near half of the chat area after the fixed left sidebar is counted.
 const DIFF_INLINE_DEFAULT_WIDTH = "clamp(28rem, calc(50vw - 8rem), 44rem)";
@@ -1079,6 +1088,29 @@ function SplitChatSurface(props: { splitViewId: SplitViewId; routeThreadId: Thre
     splitView,
     routeThreadId: props.routeThreadId,
   });
+  const serverConfigQuery = useQuery(serverConfigQueryOptions());
+  const keybindings = serverConfigQuery.data?.keybindings ?? EMPTY_KEYBINDINGS;
+  const focusedPaneThreadId = activeSplitView
+    ? resolveSplitViewFocusedPaneThreadId(activeSplitView)
+    : null;
+  const focusedPaneThread = focusedPaneThreadId
+    ? (threads.find((thread) => thread.id === focusedPaneThreadId) ?? null)
+    : null;
+  const focusedPaneProjectExists = focusedPaneThread
+    ? projects.some((project) => project.id === focusedPaneThread.projectId)
+    : false;
+  const focusedPaneTerminalState = useTerminalStateStore((state) =>
+    focusedPaneThreadId
+      ? selectThreadTerminalState(state.terminalStateByThreadId, focusedPaneThreadId)
+      : null,
+  );
+  const focusedPaneTerminalWorkspaceOpen = focusedPaneTerminalState
+    ? shouldRenderTerminalWorkspace({
+        activeProjectExists: focusedPaneProjectExists,
+        presentationMode: focusedPaneTerminalState.presentationMode,
+        terminalOpen: focusedPaneTerminalState.terminalOpen,
+      })
+    : false;
 
   useEffect(() => {
     if (!activeSplitView) {
@@ -1351,6 +1383,35 @@ function SplitChatSurface(props: { splitViewId: SplitViewId; routeThreadId: Thre
     },
     [activeSplitView, handleNewChat, navigate, removePaneFromSplitView, removeSplitView, threads],
   );
+
+  useEffect(() => {
+    if (!activeSplitView) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const command = resolveShortcutCommand(event, keybindings, {
+        context: {
+          terminalFocus: isTerminalFocused(),
+          terminalOpen: Boolean(focusedPaneTerminalState?.terminalOpen),
+          terminalWorkspaceOpen: focusedPaneTerminalWorkspaceOpen,
+          chatSplitPaneFocused: true,
+        },
+      });
+      if (command !== "chat.closeActiveSplitPane") return;
+      event.preventDefault();
+      event.stopPropagation();
+      closePaneThread(activeSplitView.focusedPaneId);
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [
+    activeSplitView,
+    closePaneThread,
+    focusedPaneTerminalState?.terminalOpen,
+    focusedPaneTerminalWorkspaceOpen,
+    keybindings,
+  ]);
 
   const handleSetRatio = useCallback(
     (nodeId: PaneId, ratio: number) => {

@@ -5,6 +5,27 @@
 
 import { memo } from "react";
 
+const CHAT_MASCOT_SRC = "/brocode-bracket-static.svg";
+
+export function ChatMascotImage({
+  className,
+  intrinsicSizePx,
+}: {
+  className: string;
+  intrinsicSizePx: number;
+}) {
+  return (
+    <img
+      alt="BroCode logo"
+      className={className}
+      draggable={false}
+      height={intrinsicSizePx}
+      src={CHAT_MASCOT_SRC}
+      width={intrinsicSizePx}
+    />
+  );
+}
+
 export const ChatEmptyStateHero = memo(function ChatEmptyStateHero({
   projectName,
 }: {
@@ -12,13 +33,9 @@ export const ChatEmptyStateHero = memo(function ChatEmptyStateHero({
 }) {
   return (
     <div className="flex flex-col items-center gap-5 select-none">
-      <img
-        alt="BroCode logo"
-        className="size-14 rounded-lg object-contain"
-        draggable={false}
-        height={112}
-        src="/brocode-hero.png"
-        width={112}
+      <ChatMascotImage
+        className="size-[84px] object-contain"
+        intrinsicSizePx={168}
       />
 
       <div className="flex flex-col items-center gap-0.5">

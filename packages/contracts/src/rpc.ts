@@ -79,9 +79,12 @@ import {
   ServerConfig,
   ServerConfigStreamEvent,
   ServerGetEnvironmentResult,
+  ServerImportLegacyDataInput,
+  ServerImportLegacyDataResult,
   ServerGetProviderUsageSnapshotInput,
   ServerGetProviderUsageSnapshotResult,
   ServerLifecycleStreamEvent,
+  ServerListLegacyDataSourcesResult,
   ServerGetSettingsResult,
   ServerListWorktreesResult,
   ServerRefreshProvidersResult,
@@ -440,6 +443,21 @@ export const WsServerListWorktreesRpc = Rpc.make(WS_METHODS.serverListWorktrees,
   error: WsRpcError,
 });
 
+export const WsServerListLegacyDataSourcesRpc = Rpc.make(
+  WS_METHODS.serverListLegacyDataSources,
+  {
+    payload: Schema.Struct({}),
+    success: ServerListLegacyDataSourcesResult,
+    error: WsRpcError,
+  },
+);
+
+export const WsServerImportLegacyDataRpc = Rpc.make(WS_METHODS.serverImportLegacyData, {
+  payload: ServerImportLegacyDataInput,
+  success: ServerImportLegacyDataResult,
+  error: WsRpcError,
+});
+
 export const WsServerGetProviderUsageSnapshotRpc = Rpc.make(
   WS_METHODS.serverGetProviderUsageSnapshot,
   {
@@ -595,6 +613,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerUpdateSettingsRpc,
   WsServerRefreshProvidersRpc,
   WsServerListWorktreesRpc,
+  WsServerListLegacyDataSourcesRpc,
+  WsServerImportLegacyDataRpc,
   WsServerGetProviderUsageSnapshotRpc,
   WsServerTranscribeVoiceRpc,
   WsServerUpsertKeybindingRpc,

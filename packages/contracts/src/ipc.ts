@@ -59,9 +59,12 @@ import type { FilesystemBrowseInput, FilesystemBrowseResult } from "./filesystem
 import type {
   ServerConfig,
   ServerGetEnvironmentResult,
+  ServerImportLegacyDataInput,
+  ServerImportLegacyDataResult,
   ServerGetProviderUsageSnapshotInput,
   ServerGetProviderUsageSnapshotResult,
   ServerGetSettingsResult,
+  ServerListLegacyDataSourcesResult,
   ServerListWorktreesResult,
   ServerRefreshProvidersResult,
   ServerUpdateSettingsInput,
@@ -265,6 +268,7 @@ export interface DesktopBridge {
   ) => Promise<T | null>;
   openExternal: (url: string) => Promise<boolean>;
   showInFolder: (path: string) => Promise<void>;
+  closeWindow?: () => Promise<void>;
   shell?: {
     showInFolder: (path: string) => Promise<void>;
   };
@@ -396,6 +400,8 @@ export interface NativeApi {
     revokeOtherAuthClients: () => Promise<{ revokedCount: number }>;
     refreshProviders: () => Promise<ServerRefreshProvidersResult>;
     listWorktrees: () => Promise<ServerListWorktreesResult>;
+    listLegacyDataSources: () => Promise<ServerListLegacyDataSourcesResult>;
+    importLegacyData: (input: ServerImportLegacyDataInput) => Promise<ServerImportLegacyDataResult>;
     getProviderUsageSnapshot: (
       input: ServerGetProviderUsageSnapshotInput,
     ) => Promise<ServerGetProviderUsageSnapshotResult>;

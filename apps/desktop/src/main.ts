@@ -48,7 +48,10 @@ import {
   shouldCheckForUpdatesOnForeground,
 } from "./updateState";
 import { registerDesktopVoiceTranscriptionHandler } from "./voiceTranscription";
-import { resolveKeyboardShortcutsMenuAccelerator } from "./menuShortcuts";
+import {
+  resolveFileCloseMenuAccelerator,
+  resolveKeyboardShortcutsMenuAccelerator,
+} from "./menuShortcuts";
 import {
   createInitialDesktopUpdateState,
   reduceDesktopUpdateStateOnCheckFailure,
@@ -96,6 +99,7 @@ const SET_THEME_CHANNEL = "desktop:set-theme";
 const CONTEXT_MENU_CHANNEL = "desktop:context-menu";
 const OPEN_EXTERNAL_CHANNEL = "desktop:open-external";
 const SHOW_IN_FOLDER_CHANNEL = "desktop:show-in-folder";
+const CLOSE_WINDOW_CHANNEL = "desktop:close-window";
 const MENU_ACTION_CHANNEL = "desktop:menu-action";
 const UPDATE_STATE_CHANNEL = "desktop:update-state";
 const UPDATE_GET_STATE_CHANNEL = "desktop:update-get-state";
@@ -845,7 +849,11 @@ function configureApplicationMenu(): void {
               },
               { type: "separator" as const },
             ]),
-        { role: process.platform === "darwin" ? "close" : "quit" },
+        {
+          label: "Close",
+          accelerator: resolveFileCloseMenuAccelerator(),
+          click: () => dispatchMenuAction("close-active-surface"),
+        },
       ],
     },
     { role: "editMenu" },
@@ -1755,6 +1763,12 @@ function registerIpcHandlers(): void {
     }
 
     shell.showItemInFolder(resolvedPath);
+  });
+
+  ipcMain.removeHandler(CLOSE_WINDOW_CHANNEL);
+  ipcMain.handle(CLOSE_WINDOW_CHANNEL, async (event) => {
+    const owner = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow();
+    owner?.close();
   });
 
   ipcMain.removeHandler(UPDATE_GET_STATE_CHANNEL);

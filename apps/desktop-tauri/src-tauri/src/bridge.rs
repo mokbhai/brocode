@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use serde::Deserialize;
-use tauri::{AppHandle, State, Url};
+use tauri::{AppHandle, Manager, State, Url};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 
 use crate::backend::BackendState;
@@ -89,6 +89,14 @@ pub async fn show_in_folder(path: String) -> Result<(), String> {
     let path =
         non_empty_path(&path).ok_or_else(|| "show_in_folder path must not be empty".to_string())?;
     tauri_plugin_opener::reveal_item_in_dir(path).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn close_window(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window was not found".to_string())?;
+    window.close().map_err(|error| error.to_string())
 }
 
 fn file_path_to_path_buf(file_path: tauri_plugin_dialog::FilePath) -> Result<PathBuf, String> {

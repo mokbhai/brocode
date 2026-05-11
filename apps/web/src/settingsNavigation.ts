@@ -8,6 +8,7 @@ import {
   ArchiveIcon,
   BellIcon,
   BrainIcon,
+  DownloadIcon,
   type LucideIcon,
   PaletteIcon,
   SettingsIcon,
@@ -22,6 +23,7 @@ export const SETTINGS_SECTION_IDS = [
   "behavior",
   "worktrees",
   "archived",
+  "data",
   "models",
   "advanced",
 ] as const;
@@ -94,6 +96,14 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
     description: "View and restore archived threads.",
     icon: ArchiveIcon,
     eyebrow: "Thread management",
+  },
+  {
+    id: "data",
+    group: "brocode",
+    label: "Data Import",
+    description: "Bring project and thread lists over from DPCode or T3Code.",
+    icon: DownloadIcon,
+    eyebrow: "Migration",
   },
   {
     id: "models",

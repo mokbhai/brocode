@@ -348,6 +348,26 @@ describe("buildCodexProcessEnv", () => {
     );
   });
 
+  it("enables the local brocode-browser plugin when requested", () => {
+    const env = buildCodexProcessEnv({
+      env: {},
+      enableBrowserTool: true,
+      platform: "darwin",
+    });
+
+    expect(env.BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN).toBe("0");
+  });
+
+  it("disables the local brocode-browser plugin when explicitly turned off", () => {
+    const env = buildCodexProcessEnv({
+      env: { BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN: "0" },
+      enableBrowserTool: false,
+      platform: "darwin",
+    });
+
+    expect(env.BROCODE_DISABLE_CODEX_BROCODE_BROWSER_PLUGIN).toBe("1");
+  });
+
   it("resolves the browser-use pipe path from desktop env aliases", () => {
     expect(
       resolveCodexBrowserUsePipePath({

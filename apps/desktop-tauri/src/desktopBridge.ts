@@ -115,6 +115,7 @@ function createDesktopBridge(): DesktopBridge {
     showContextMenu: async () => null,
     openExternal: (url) => invoke<boolean>("open_external", { url }),
     showInFolder: (path) => invoke<void>("show_in_folder", { path }),
+    closeWindow: () => invoke<void>("close_window"),
     shell: {
       showInFolder: (path) => invoke<void>("show_in_folder", { path }),
     },

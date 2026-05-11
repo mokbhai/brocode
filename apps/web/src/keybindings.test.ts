@@ -184,6 +184,28 @@ const DEFAULT_BINDINGS = compile([
     whenAst: whenNot(whenIdentifier("terminalFocus")),
   },
   {
+    shortcut: modShortcut("w"),
+    command: "chat.closeActiveSplitPane",
+    whenAst: whenAnd(
+      whenIdentifier("chatSplitPaneFocused"),
+      whenAnd(
+        whenNot(whenIdentifier("terminalWorkspaceOpen")),
+        whenNot(whenIdentifier("terminalFocus")),
+      ),
+    ),
+  },
+  {
+    shortcut: modShortcut("w"),
+    command: "chat.closeActive",
+    whenAst: whenAnd(
+      whenNot(whenIdentifier("chatSplitPaneFocused")),
+      whenAnd(
+        whenNot(whenIdentifier("terminalWorkspaceOpen")),
+        whenNot(whenIdentifier("terminalFocus")),
+      ),
+    ),
+  },
+  {
     shortcut: modShortcut("1"),
     command: "thread.jump.1",
     whenAst: whenAnd(
@@ -494,11 +516,84 @@ describe("workspace terminal tab shortcuts", () => {
       }),
       "terminal.workspace.closeActive",
     );
-    assert.isNull(
+    assert.strictEqual(
       resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
         platform: "MacIntel",
         context: { terminalWorkspaceOpen: false, terminalFocus: false },
       }),
+      "chat.closeActive",
+    );
+  });
+
+  it("resolves the active split pane close shortcut only for focused split panes", () => {
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: {
+          chatSplitPaneFocused: true,
+          terminalWorkspaceOpen: false,
+          terminalFocus: false,
+        },
+      }),
+      "chat.closeActiveSplitPane",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: {
+          chatSplitPaneFocused: false,
+          terminalWorkspaceOpen: false,
+          terminalFocus: false,
+        },
+      }),
+      "chat.closeActive",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: {
+          chatSplitPaneFocused: true,
+          terminalWorkspaceOpen: true,
+          terminalFocus: false,
+        },
+      }),
+      "terminal.workspace.closeActive",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: {
+          chatSplitPaneFocused: true,
+          terminalWorkspaceOpen: false,
+          terminalFocus: true,
+        },
+      }),
+      "terminal.close",
+    );
+  });
+
+  it("resolves the active chat close shortcut only outside split and terminal contexts", () => {
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: {
+          chatSplitPaneFocused: false,
+          terminalWorkspaceOpen: false,
+          terminalFocus: false,
+        },
+      }),
+      "chat.closeActive",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "w", metaKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: {
+          chatSplitPaneFocused: true,
+          terminalWorkspaceOpen: false,
+          terminalFocus: false,
+        },
+      }),
+      "chat.closeActiveSplitPane",
     );
   });
 

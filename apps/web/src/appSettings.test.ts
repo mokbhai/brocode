@@ -256,6 +256,7 @@ describe("getProviderStartOptions", () => {
       getProviderStartOptions({
         claudeBinaryPath: "/usr/local/bin/claude",
         codexBinaryPath: "",
+        enableCodexBrowserTool: false,
         codexHomePath: "/Users/you/.codex",
         cursorApiEndpoint: "http://localhost:3000",
         cursorBinaryPath: "/usr/local/bin/agent",
@@ -286,6 +287,7 @@ describe("getProviderStartOptions", () => {
       getProviderStartOptions({
         claudeBinaryPath: "",
         codexBinaryPath: "",
+        enableCodexBrowserTool: false,
         codexHomePath: "",
         cursorApiEndpoint: "",
         cursorBinaryPath: "",
@@ -295,6 +297,27 @@ describe("getProviderStartOptions", () => {
         openCodeServerUrl: "",
       }),
     ).toBeUndefined();
+  });
+
+  it("passes the Codex browser tool preference to new sessions", () => {
+    expect(
+      getProviderStartOptions({
+        claudeBinaryPath: "",
+        codexBinaryPath: "",
+        enableCodexBrowserTool: true,
+        codexHomePath: "",
+        cursorApiEndpoint: "",
+        cursorBinaryPath: "",
+        geminiBinaryPath: "",
+        openCodeBinaryPath: "",
+        openCodeServerPassword: "",
+        openCodeServerUrl: "",
+      }),
+    ).toEqual({
+      codex: {
+        enableBrowserTool: true,
+      },
+    });
   });
 });
 
@@ -462,6 +485,7 @@ describe("AppSettingsSchema", () => {
       defaultThreadEnvMode: "local",
       confirmThreadDelete: false,
       confirmTerminalTabClose: true,
+      enableCodexBrowserTool: false,
       enableAssistantStreaming: false,
       sidebarProjectSortOrder: DEFAULT_SIDEBAR_PROJECT_SORT_ORDER,
       sidebarThreadSortOrder: DEFAULT_SIDEBAR_THREAD_SORT_ORDER,

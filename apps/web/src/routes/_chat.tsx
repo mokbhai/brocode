@@ -1,7 +1,7 @@
 import { type ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   goBackInAppHistory,
@@ -11,6 +11,11 @@ import {
 import ShortcutsDialog from "../components/ShortcutsDialog";
 import { shouldRenderTerminalWorkspace } from "../components/ChatView.logic";
 import ThreadSidebar from "../components/Sidebar";
+import {
+  CHAT_CLOSE_DOUBLE_PRESS_MS,
+  resolveChatCloseShortcutPress,
+  type PendingChatCloseShortcut,
+} from "../chatCloseShortcut";
 import { isElectron } from "../env";
 import { useHandleNewChat } from "../hooks/useHandleNewChat";
 import { useDisposableThreadLifecycle } from "../hooks/useDisposableThreadLifecycle";
@@ -22,7 +27,10 @@ import {
 } from "../lib/projectShortcutTargets";
 import { resolveThreadEnvironmentMode } from "../lib/threadEnvironment";
 import { isTerminalFocused } from "../lib/terminalFocus";
-import { serverConfigQueryOptions } from "../lib/serverReactQuery";
+import {
+  serverConfigQueryOptions,
+  serverLegacyDataSourcesQueryOptions,
+} from "../lib/serverReactQuery";
 import { resolveShortcutCommand } from "../keybindings";
 import { useStore } from "../store";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
@@ -200,6 +208,8 @@ function ChatRouteGlobalShortcuts() {
   const { settings: appSettings } = useAppSettings();
   const { toggleSidebar } = useSidebar();
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false);
+  const pendingChatCloseShortcutRef = useRef<PendingChatCloseShortcut | null>(null);
+  const pendingChatCloseTimerRef = useRef<number | null>(null);
   const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
   const selectedThreadIdsSize = useThreadSelectionStore((state) => state.selectedThreadIds.size);
   const {
@@ -239,6 +249,14 @@ function ChatRouteGlobalShortcuts() {
   });
   const currentProjectId = resolveCurrentProjectTargetId(projects, activeProject?.id ?? null);
   const latestUsableProjectId = resolveLatestProjectTargetId(projects, latestProjectId);
+  const routeSplitViewId = useLocation({
+    select: (location) => {
+      const search = location.search as { readonly splitViewId?: unknown };
+      return typeof search.splitViewId === "string" && search.splitViewId.length > 0
+        ? search.splitViewId
+        : null;
+    },
+  });
 
   useEffect(() => {
     if (!currentProjectId) {
@@ -253,6 +271,71 @@ function ChatRouteGlobalShortcuts() {
     }
   }, [clearLatestProjectId, latestProjectId, latestUsableProjectId, threadsHydrated]);
 
+  const clearPendingChatCloseShortcut = useCallback(() => {
+    pendingChatCloseShortcutRef.current = null;
+    if (pendingChatCloseTimerRef.current !== null) {
+      window.clearTimeout(pendingChatCloseTimerRef.current);
+      pendingChatCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const closeDesktopWindow = useCallback(() => {
+    const closeWindow = window.desktopBridge?.closeWindow;
+    if (typeof closeWindow === "function") {
+      void closeWindow();
+      return;
+    }
+    window.close();
+  }, []);
+
+  const openFreshChatInCurrentProject = useCallback(() => {
+    const branch = activeThread?.branch ?? activeDraftThread?.branch ?? null;
+    const worktreePath = activeThread?.worktreePath ?? activeDraftThread?.worktreePath ?? null;
+    const envMode =
+      activeDraftThread?.envMode ??
+      resolveThreadEnvironmentMode({
+        envMode: activeThread?.envMode,
+        worktreePath,
+      });
+
+    if (currentProjectId) {
+      void handleNewThread(currentProjectId, {
+        fresh: true,
+        entryPoint: "chat",
+        branch,
+        worktreePath,
+        envMode,
+      });
+      return;
+    }
+
+    void handleNewChat({ fresh: true });
+  }, [activeDraftThread, activeThread, currentProjectId, handleNewChat, handleNewThread]);
+
+  const handleActiveChatCloseShortcut = useCallback(() => {
+    const resolution = resolveChatCloseShortcutPress({
+      pending: pendingChatCloseShortcutRef.current,
+      now: performance.now(),
+    });
+    clearPendingChatCloseShortcut();
+
+    if (resolution.action === "close-window") {
+      closeDesktopWindow();
+      return;
+    }
+
+    pendingChatCloseShortcutRef.current = resolution.pending;
+    pendingChatCloseTimerRef.current = window.setTimeout(() => {
+      pendingChatCloseShortcutRef.current = null;
+      pendingChatCloseTimerRef.current = null;
+      openFreshChatInCurrentProject();
+    }, CHAT_CLOSE_DOUBLE_PRESS_MS);
+  }, [clearPendingChatCloseShortcut, closeDesktopWindow, openFreshChatInCurrentProject]);
+
+  useEffect(() => {
+    return clearPendingChatCloseShortcut;
+  }, [clearPendingChatCloseShortcut]);
+
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
@@ -260,6 +343,7 @@ function ChatRouteGlobalShortcuts() {
         terminalFocus: isTerminalFocused(),
         terminalOpen,
         terminalWorkspaceOpen,
+        chatSplitPaneFocused: routeSplitViewId !== null,
       };
 
       const isShortcutsHelpShortcut =
@@ -339,6 +423,13 @@ function ChatRouteGlobalShortcuts() {
             }),
           entryPoint: "terminal",
         });
+        return;
+      }
+
+      if (command === "chat.closeActive") {
+        event.preventDefault();
+        event.stopPropagation();
+        handleActiveChatCloseShortcut();
         return;
       }
 
@@ -423,6 +514,7 @@ function ChatRouteGlobalShortcuts() {
     clearSelection,
     currentProjectId,
     handleNewChat,
+    handleActiveChatCloseShortcut,
     handleNewThread,
     keybindings,
     latestUsableProjectId,
@@ -435,6 +527,7 @@ function ChatRouteGlobalShortcuts() {
     selectedThreadIdsSize,
     terminalOpen,
     terminalWorkspaceOpen,
+    routeSplitViewId,
     toggleSidebar,
   ]);
 
@@ -449,6 +542,10 @@ function ChatRouteGlobalShortcuts() {
         toggleSidebar();
         return;
       }
+      if (action === "close-active-surface") {
+        handleActiveChatCloseShortcut();
+        return;
+      }
       if (action !== "open-settings") return;
       void navigate({ to: "/settings" });
     });
@@ -456,7 +553,7 @@ function ChatRouteGlobalShortcuts() {
     return () => {
       unsubscribe?.();
     };
-  }, [navigate, toggleSidebar]);
+  }, [handleActiveChatCloseShortcut, navigate, toggleSidebar]);
 
   return (
     <ShortcutsDialog
@@ -469,6 +566,7 @@ function ChatRouteGlobalShortcuts() {
         terminalFocus: isTerminalFocused(),
         terminalOpen,
         terminalWorkspaceOpen,
+        chatSplitPaneFocused: routeSplitViewId !== null,
       }}
       isElectron={isElectron}
     />
@@ -487,8 +585,59 @@ const SIDEBAR_INNER_CLASS = {
 } as const;
 
 function ChatRouteLayout() {
-  const { settings } = useAppSettings();
+  const { settings, updateSettings } = useAppSettings();
   const side = settings.sidebarSide;
+  const navigate = useNavigate();
+  const threadsHydrated = useStore((state) => state.threadsHydrated);
+  const projectCount = useStore((state) => state.projects.length);
+  const threadCount = useStore((state) => state.threadIds.length);
+  const legacySourcesQuery = useQuery({
+    ...serverLegacyDataSourcesQueryOptions(),
+    enabled: !settings.legacyDataImportPromptDismissed && threadsHydrated,
+  });
+
+  useEffect(() => {
+    if (settings.legacyDataImportPromptDismissed || !threadsHydrated) {
+      return;
+    }
+    if (projectCount > 0 || threadCount > 0) {
+      return;
+    }
+    const sources = legacySourcesQuery.data?.sources ?? [];
+    const importableSource = sources.find(
+      (source) => source.exists && !source.error && (source.projectCount > 0 || source.threadCount > 0),
+    );
+    if (!importableSource) {
+      return;
+    }
+
+    const toastId = toastManager.add({
+      type: "info",
+      title: "Import previous projects?",
+      description: `${importableSource.label} has ${importableSource.projectCount} project${importableSource.projectCount === 1 ? "" : "s"} and ${importableSource.threadCount} thread${importableSource.threadCount === 1 ? "" : "s"}.`,
+      timeout: 0,
+      actionProps: {
+        children: "Open import",
+        onClick: () => {
+          updateSettings({ legacyDataImportPromptDismissed: true });
+          toastManager.close(toastId);
+          void navigate({ to: "/settings", search: () => ({ section: "data" }) });
+        },
+      },
+      data: { allowCrossThreadVisibility: true },
+    });
+    return () => {
+      toastManager.close(toastId);
+    };
+  }, [
+    legacySourcesQuery.data?.sources,
+    navigate,
+    projectCount,
+    settings.legacyDataImportPromptDismissed,
+    threadCount,
+    threadsHydrated,
+    updateSettings,
+  ]);
 
   const sidebarElement = (
     <Sidebar

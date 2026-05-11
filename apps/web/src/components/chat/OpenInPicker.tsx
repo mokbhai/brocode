@@ -62,12 +62,13 @@ export const OpenInPicker = memo(function OpenInPicker({
   }, [preferredEditor, keybindings, openInCwd]);
 
   return (
-    <Group aria-label="Subscription actions">
+    <Group aria-label="Open in editor">
       <Button
         size="xs"
         variant="outline"
         disabled={!preferredEditor || !openInCwd}
         onClick={() => openInEditor(preferredEditor)}
+        title={primaryOption ? `Open in ${primaryOption.label}` : "Open in editor"}
       >
         {primaryOption?.Icon && <primaryOption.Icon aria-hidden="true" className="size-3.5" />}
         <span className="sr-only @sm/header-actions:not-sr-only @sm/header-actions:ml-0.5">
@@ -76,7 +77,9 @@ export const OpenInPicker = memo(function OpenInPicker({
       </Button>
       <GroupSeparator className="hidden @sm/header-actions:block" />
       <Menu>
-        <MenuTrigger render={<Button aria-label="Copy options" size="icon-xs" variant="outline" />}>
+        <MenuTrigger
+          render={<Button aria-label="Choose editor" size="icon-xs" variant="outline" />}
+        >
           <ChevronDownIcon aria-hidden="true" className="size-4" />
         </MenuTrigger>
         <MenuPopup align="end">

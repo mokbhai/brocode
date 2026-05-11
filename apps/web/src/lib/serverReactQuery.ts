@@ -9,6 +9,7 @@ export const serverQueryKeys = {
   environment: () => ["server", "environment"] as const,
   settings: () => ["server", "settings"] as const,
   worktrees: () => ["server", "worktrees"] as const,
+  legacyDataSources: () => ["server", "legacyDataSources"] as const,
   providerUsage: (provider: ProviderKind | null | undefined, homePath?: string | null) =>
     ["server", "providerUsage", provider ?? null, homePath ?? null] as const,
 };
@@ -63,6 +64,19 @@ export function serverWorktreesQueryOptions() {
     queryFn: async () => {
       const api = ensureNativeApi();
       return api.server.listWorktrees();
+    },
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+}
+
+export function serverLegacyDataSourcesQueryOptions() {
+  return queryOptions({
+    queryKey: serverQueryKeys.legacyDataSources(),
+    queryFn: async () => {
+      const api = ensureNativeApi();
+      return api.server.listLegacyDataSources();
     },
     staleTime: 30_000,
     refetchOnWindowFocus: true,

@@ -15,6 +15,7 @@ const SET_THEME_CHANNEL = "desktop:set-theme";
 const CONTEXT_MENU_CHANNEL = "desktop:context-menu";
 const OPEN_EXTERNAL_CHANNEL = "desktop:open-external";
 const SHOW_IN_FOLDER_CHANNEL = "desktop:show-in-folder";
+const CLOSE_WINDOW_CHANNEL = "desktop:close-window";
 const MENU_ACTION_CHANNEL = "desktop:menu-action";
 const UPDATE_STATE_CHANNEL = "desktop:update-state";
 const UPDATE_GET_STATE_CHANNEL = "desktop:update-get-state";
@@ -42,6 +43,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   showContextMenu: (items, position) => ipcRenderer.invoke(CONTEXT_MENU_CHANNEL, items, position),
   openExternal: (url: string) => ipcRenderer.invoke(OPEN_EXTERNAL_CHANNEL, url),
   showInFolder: (path: string) => ipcRenderer.invoke(SHOW_IN_FOLDER_CHANNEL, path),
+  closeWindow: () => ipcRenderer.invoke(CLOSE_WINDOW_CHANNEL),
   shell: {
     showInFolder: (path: string) => ipcRenderer.invoke(SHOW_IN_FOLDER_CHANNEL, path),
   },

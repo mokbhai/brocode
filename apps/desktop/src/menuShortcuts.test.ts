@@ -3,7 +3,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { resolveKeyboardShortcutsMenuAccelerator } from "./menuShortcuts";
+import {
+  resolveFileCloseMenuAccelerator,
+  resolveKeyboardShortcutsMenuAccelerator,
+} from "./menuShortcuts";
 
 describe("resolveKeyboardShortcutsMenuAccelerator", () => {
   it("uses the native shortcuts help accelerator on macOS", () => {
@@ -13,5 +16,11 @@ describe("resolveKeyboardShortcutsMenuAccelerator", () => {
   it("leaves Windows and Linux zoom shortcuts to Electron's native View menu roles", () => {
     expect(resolveKeyboardShortcutsMenuAccelerator("win32")).toBeUndefined();
     expect(resolveKeyboardShortcutsMenuAccelerator("linux")).toBeUndefined();
+  });
+});
+
+describe("resolveFileCloseMenuAccelerator", () => {
+  it("keeps Cmd/Ctrl+W routed through the application close-surface command", () => {
+    expect(resolveFileCloseMenuAccelerator()).toBe("CmdOrCtrl+W");
   });
 });

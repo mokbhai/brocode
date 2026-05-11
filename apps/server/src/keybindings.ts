@@ -93,6 +93,16 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+alt+r", command: "chat.newCursor", when: "!terminalFocus" },
   { key: "mod+alt+g", command: "chat.newGemini", when: "!terminalFocus" },
   { key: "mod+\\", command: "chat.split", when: "!terminalFocus" },
+  {
+    key: "mod+w",
+    command: "chat.closeActiveSplitPane",
+    when: "chatSplitPaneFocused && !terminalWorkspaceOpen && !terminalFocus",
+  },
+  {
+    key: "mod+w",
+    command: "chat.closeActive",
+    when: "!chatSplitPaneFocused && !terminalWorkspaceOpen && !terminalFocus",
+  },
   { key: "mod+1", command: "thread.jump.1", when: "!terminalFocus && !terminalWorkspaceOpen" },
   { key: "mod+2", command: "thread.jump.2", when: "!terminalFocus && !terminalWorkspaceOpen" },
   { key: "mod+3", command: "thread.jump.3", when: "!terminalFocus && !terminalWorkspaceOpen" },

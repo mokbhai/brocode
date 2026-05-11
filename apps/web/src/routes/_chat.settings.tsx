@@ -56,6 +56,7 @@ import {
 } from "../lib/icons";
 import {
   serverConfigQueryOptions,
+  serverLegacyDataSourcesQueryOptions,
   serverQueryKeys,
   serverWorktreesQueryOptions,
 } from "../lib/serverReactQuery";
@@ -317,7 +318,32 @@ function SettingsRouteView() {
   const queryClient = useQueryClient();
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const serverWorktreesQuery = useQuery(serverWorktreesQueryOptions());
+  const legacyDataSourcesQuery = useQuery(serverLegacyDataSourcesQueryOptions());
   const removeWorktreeMutation = useMutation(gitRemoveWorktreeMutationOptions({ queryClient }));
+  const importLegacyDataMutation = useMutation({
+    mutationFn: async (sourceDbPath: string) => {
+      const api = readNativeApi() ?? ensureNativeApi();
+      return api.server.importLegacyData({ sourceDbPath });
+    },
+    onSuccess: async (result) => {
+      const api = readNativeApi() ?? ensureNativeApi();
+      const snapshot = await api.orchestration.getSnapshot();
+      syncServerReadModel(snapshot);
+      await queryClient.invalidateQueries({ queryKey: serverQueryKeys.legacyDataSources() });
+      toastManager.add({
+        type: "success",
+        title: "Data imported",
+        description: `${result.projectsCreated} project${result.projectsCreated === 1 ? "" : "s"}, ${result.threadsCreated} thread${result.threadsCreated === 1 ? "" : "s"}, and ${result.messagesImported} message${result.messagesImported === 1 ? "" : "s"} were imported.`,
+      });
+    },
+    onError: (error) => {
+      toastManager.add({
+        type: "error",
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "Unable to import legacy data.",
+      });
+    },
+  });
   const syncServerReadModel = useStore((store) => store.syncServerReadModel);
   const threads = useStore(useMemo(() => createAllThreadsSelector(), []));
   const projects = useStore((store) => store.projects);
@@ -359,6 +385,7 @@ function SettingsRouteView() {
     Partial<Record<ProviderKind, string | null>>
   >({});
   const [showAllCustomModels, setShowAllCustomModels] = useState(false);
+  const [legacyImportCustomDbPath, setLegacyImportCustomDbPath] = useState("");
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState(
     readBrowserNotificationPermissionState(),
   );
@@ -483,6 +510,9 @@ function SettingsRouteView() {
     ...(settings.enableAssistantStreaming !== defaults.enableAssistantStreaming
       ? ["Assistant output"]
       : []),
+    ...(settings.enableCodexBrowserTool !== defaults.enableCodexBrowserTool
+      ? ["Codex browser tool"]
+      : []),
     ...(settings.diffWordWrap !== defaults.diffWordWrap ? ["Diff line wrapping"] : []),
     ...(settings.confirmThreadDelete !== defaults.confirmThreadDelete
       ? ["Delete confirmation"]
@@ -502,6 +532,9 @@ function SettingsRouteView() {
       ? ["Custom models"]
       : []),
     ...(isInstallSettingsDirty ? ["Provider installs"] : []),
+    ...(settings.legacyDataImportPromptDismissed !== defaults.legacyDataImportPromptDismissed
+      ? ["Import prompt"]
+      : []),
   ];
 
   const openKeybindingsFile = useCallback(() => {
@@ -1478,6 +1511,34 @@ function SettingsRouteView() {
           />
 
           <SettingsRow
+            title="Codex browser tool"
+            description="Expose BroCode's in-app browser to new Codex sessions for navigation, screenshots, and page inspection."
+            resetAction={
+              settings.enableCodexBrowserTool !== defaults.enableCodexBrowserTool ? (
+                <SettingResetButton
+                  label="Codex browser tool"
+                  onClick={() =>
+                    updateSettings({
+                      enableCodexBrowserTool: defaults.enableCodexBrowserTool,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={settings.enableCodexBrowserTool}
+                onCheckedChange={(checked) =>
+                  updateSettings({
+                    enableCodexBrowserTool: Boolean(checked),
+                  })
+                }
+                aria-label="Enable Codex browser tool"
+              />
+            }
+          />
+
+          <SettingsRow
             title="Diff line wrapping"
             description="Set the default wrap state when the diff panel opens. The in-panel wrap toggle only affects the current diff session."
             resetAction={
@@ -1983,6 +2044,142 @@ function SettingsRouteView() {
     </div>
   );
 
+  const renderDataPanel = () => {
+    const importableSources = legacyDataSourcesQuery.data?.sources ?? [];
+    return (
+      <div className="space-y-6">
+        <SettingsSection title="Import from older installs">
+          <div className="space-y-2">
+            <SettingsRow
+              title="DPCode and T3Code data"
+              description="Import projects, threads, and chat messages from a previous local state database."
+              status={
+                legacyDataSourcesQuery.isLoading
+                  ? "Looking for previous DPCode and T3Code homes..."
+                  : legacyDataSourcesQuery.isError
+                    ? legacyDataSourcesQuery.error instanceof Error
+                      ? legacyDataSourcesQuery.error.message
+                      : "Unable to inspect legacy data sources."
+                    : "Existing BroCode data is kept. Matching projects and threads are reused, and missing messages are added."
+              }
+              control={
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={legacyDataSourcesQuery.isFetching}
+                  onClick={() =>
+                    void queryClient.invalidateQueries({
+                      queryKey: serverQueryKeys.legacyDataSources(),
+                    })
+                  }
+                >
+                  {legacyDataSourcesQuery.isFetching ? "Refreshing..." : "Refresh"}
+                </Button>
+              }
+            >
+              <div className="mt-4 space-y-2">
+                {importableSources.length === 0 ? (
+                  <div className="rounded-xl border border-border/70 px-3 py-3 text-xs text-muted-foreground">
+                    No previous DPCode or T3Code state database was found in the default locations.
+                  </div>
+                ) : (
+                  importableSources.map((source) => {
+                    const canImport =
+                      source.exists &&
+                      !source.error &&
+                      (source.projectCount > 0 ||
+                        source.threadCount > 0 ||
+                        source.messageCount > 0);
+                    return (
+                      <div
+                        key={source.dbPath}
+                        className="rounded-xl border border-border/70 px-3 py-3"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 space-y-1">
+                            <div className="text-sm font-medium text-foreground">
+                              {source.label}
+                            </div>
+                            <div className="break-all font-mono text-[11px] text-muted-foreground">
+                              {source.dbPath}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {source.error
+                                ? source.error
+                                : source.exists
+                                  ? `${source.projectCount} project${source.projectCount === 1 ? "" : "s"}, ${source.threadCount} thread${source.threadCount === 1 ? "" : "s"}, and ${source.messageCount} message${source.messageCount === 1 ? "" : "s"} available.`
+                                  : "No database at this location."}
+                            </div>
+                          </div>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            disabled={!canImport || importLegacyDataMutation.isPending}
+                            onClick={() => importLegacyDataMutation.mutate(source.dbPath)}
+                          >
+                            {importLegacyDataMutation.isPending ? "Importing..." : "Import"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </SettingsRow>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="Custom source">
+          <div className="space-y-2">
+            <SettingsRow
+              title="Import from a state.sqlite path"
+              description="Use this when the older install used a custom DPCode or T3Code home directory."
+              control={
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={
+                    legacyImportCustomDbPath.trim().length === 0 ||
+                    importLegacyDataMutation.isPending
+                  }
+                  onClick={() => importLegacyDataMutation.mutate(legacyImportCustomDbPath.trim())}
+                >
+                  {importLegacyDataMutation.isPending ? "Importing..." : "Import"}
+                </Button>
+              }
+            >
+              <div className="mt-3">
+                <Input
+                  value={legacyImportCustomDbPath}
+                  onChange={(event) => setLegacyImportCustomDbPath(event.target.value)}
+                  placeholder="/path/to/state.sqlite"
+                  spellCheck={false}
+                />
+              </div>
+            </SettingsRow>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title="First-run prompt">
+          <div className="space-y-2">
+            <SettingsRow
+              title="Show import suggestion"
+              description="When this install has no projects or threads, suggest importing previous local data if it is found."
+              control={
+                <Switch
+                  checked={!settings.legacyDataImportPromptDismissed}
+                  onCheckedChange={(checked) =>
+                    updateSettings({ legacyDataImportPromptDismissed: !checked })
+                  }
+                />
+              }
+            />
+          </div>
+        </SettingsSection>
+      </div>
+    );
+  };
+
   const renderAdvancedPanel = () => (
     <div className="space-y-6">
       <SettingsSection title="Provider installs">
@@ -2355,6 +2552,8 @@ function SettingsRouteView() {
         return renderWorktreesPanel();
       case "archived":
         return renderArchivedPanel();
+      case "data":
+        return renderDataPanel();
       case "models":
         return renderModelsPanel();
       case "advanced":

@@ -5,6 +5,10 @@
 
 import type { MenuItemConstructorOptions } from "electron";
 
+export function resolveFileCloseMenuAccelerator(): "CmdOrCtrl+W" {
+  return "CmdOrCtrl+W";
+}
+
 export function resolveKeyboardShortcutsMenuAccelerator(
   platform: NodeJS.Platform,
 ): MenuItemConstructorOptions["accelerator"] | undefined {

@@ -1,0 +1,102 @@
+<svg width="176" height="176" viewBox="0 0 176 176" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">BroCode Bracket Pop animated logo</title>
+  <desc id="desc">A cute animated coding helper face with bracket symbols that bounce upward.</desc>
+  <defs>
+    <linearGradient id="face" x1="54" y1="42" x2="122" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF7D6"/>
+      <stop offset="1" stop-color="#F4C95D"/>
+    </linearGradient>
+    <filter id="shadow" x="-20" y="-20" width="216" height="216" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+    <style>
+      .head {
+        animation: eager-bounce 2.1s cubic-bezier(.45, 0, .25, 1) infinite;
+        transform-origin: 88px 88px;
+      }
+
+      .expression {
+        animation: expression-nod 2.1s cubic-bezier(.45, 0, .25, 1) infinite;
+        transform-origin: 88px 91px;
+      }
+
+      .eyes {
+        animation: blink 3.1s ease-in-out infinite;
+        transform-origin: 88px 82px;
+      }
+
+      .spark {
+        animation: spark-pop 2.1s ease-in-out infinite;
+        transform-origin: 88px 64px;
+      }
+
+      .bracket-left,
+      .bracket-right {
+        animation: bracket-pop 2.1s ease-in-out infinite;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      .bracket-right {
+        animation-delay: .08s;
+      }
+
+      @keyframes eager-bounce {
+        0%, 100% { transform: translateY(0) scale(1); }
+        34% { transform: translateY(-8px) scale(1.015); }
+        48% { transform: translateY(1px) scale(.995); }
+      }
+
+      @keyframes expression-nod {
+        0%, 100% { transform: translateY(0); }
+        34% { transform: translateY(-1.5px); }
+        48% { transform: translateY(.5px); }
+      }
+
+      @keyframes blink {
+        0%, 8%, 11%, 100% { transform: scaleY(1); }
+        9.5% { transform: scaleY(.12); }
+      }
+
+      @keyframes spark-pop {
+        0%, 100% { transform: rotate(0deg) scale(1); }
+        38% { transform: rotate(8deg) scale(1.14); }
+        52% { transform: rotate(-3deg) scale(.98); }
+      }
+
+      @keyframes bracket-pop {
+        0%, 100% { transform: translateY(0) scale(1); opacity: .9; }
+        34% { transform: translateY(-4px) scale(1.12); opacity: 1; }
+        52% { transform: translateY(1px) scale(.98); opacity: .9; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .head,
+        .expression,
+        .eyes,
+        .spark,
+        .bracket-left,
+        .bracket-right {
+          animation: none;
+        }
+      }
+    </style>
+  </defs>
+  <g filter="url(#shadow)" transform="translate(88 88) scale(1.5) translate(-88 -88)">
+    <g class="spark">
+      <path d="M88 34L96 56L118 64L96 72L88 94L80 72L58 64L80 56L88 34Z" fill="#7DD3FC"/>
+    </g>
+    <g class="head">
+      <path d="M54 78C54 63.64 65.64 52 80 52H96C110.36 52 122 63.64 122 78V94C122 108.36 110.36 120 96 120H80C65.64 120 54 108.36 54 94V78Z" fill="url(#face)" stroke="#050506" stroke-width="7"/>
+      <g class="expression">
+        <g class="eyes">
+          <circle cx="78" cy="82" r="5" fill="#050506"/>
+          <circle cx="98" cy="82" r="5" fill="#050506"/>
+        </g>
+        <path d="M78 97C83 103 93 103 98 97" stroke="#050506" stroke-width="6" stroke-linecap="round"/>
+      </g>
+    </g>
+    <path class="bracket-left" d="M46 100L34 106L46 112" stroke="#86EFAC" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="bracket-right" d="M130 100L142 106L130 112" stroke="#86EFAC" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -66,6 +66,14 @@ const whenThreadJumpAvailable = whenAnd(
   whenNotTerminalFocus,
   whenNot(whenIdentifier("terminalWorkspaceOpen")),
 );
+const whenFocusedSplitPaneCanClose = whenAnd(
+  whenIdentifier("chatSplitPaneFocused"),
+  whenAnd(whenNot(whenIdentifier("terminalWorkspaceOpen")), whenNotTerminalFocus),
+);
+const whenActiveChatCanClose = whenAnd(
+  whenNot(whenIdentifier("chatSplitPaneFocused")),
+  whenAnd(whenNot(whenIdentifier("terminalWorkspaceOpen")), whenNotTerminalFocus),
+);
 
 export const DEFAULT_SHORTCUT_FALLBACKS: ResolvedKeybindingsConfig = [
   {
@@ -112,6 +120,16 @@ export const DEFAULT_SHORTCUT_FALLBACKS: ResolvedKeybindingsConfig = [
     command: "chat.split",
     shortcut: commandShortcut("\\"),
     whenAst: whenNotTerminalFocus,
+  },
+  {
+    command: "chat.closeActiveSplitPane",
+    shortcut: commandShortcut("w"),
+    whenAst: whenFocusedSplitPaneCanClose,
+  },
+  {
+    command: "chat.closeActive",
+    shortcut: commandShortcut("w"),
+    whenAst: whenActiveChatCanClose,
   },
   {
     command: "thread.jump.1",

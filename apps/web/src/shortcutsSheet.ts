@@ -107,6 +107,16 @@ const AVAILABLE_NOW_DEFINITIONS: readonly ShortcutDefinition[] = [
     description: "Open the current conversation in a second pane.",
   },
   {
+    command: "chat.closeActiveSplitPane",
+    label: "Close split pane",
+    description: "Close the focused pane in a split chat layout.",
+  },
+  {
+    command: "chat.closeActive",
+    label: "Close chat",
+    description: "Close the active chat surface and open a fresh thread in the same project.",
+  },
+  {
     command: "terminal.toggle",
     label: "Toggle terminal",
     description: "Show or hide the terminal surface for the active thread.",

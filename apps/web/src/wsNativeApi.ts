@@ -551,6 +551,8 @@ export function createWsNativeApi(): NativeApi {
         }),
       refreshProviders: () => transport.request(WS_METHODS.serverRefreshProviders),
       listWorktrees: () => transport.request(WS_METHODS.serverListWorktrees),
+      listLegacyDataSources: () => transport.request(WS_METHODS.serverListLegacyDataSources),
+      importLegacyData: (input) => transport.request(WS_METHODS.serverImportLegacyData, input),
       getProviderUsageSnapshot: (input) =>
         transport.request(WS_METHODS.serverGetProviderUsageSnapshot, input),
       transcribeVoice: (input) => {

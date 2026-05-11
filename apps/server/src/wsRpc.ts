@@ -24,6 +24,7 @@ import { ServerAuth } from "./auth/Services/ServerAuth";
 import { SessionCredentialService } from "./auth/Services/SessionCredentialService";
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery";
 import { ServerConfig } from "./config";
+import { importLegacyProjectThreads, listLegacyDataSources } from "./legacyDataImport";
 import { GitCore } from "./git/Services/GitCore";
 import { GitManager } from "./git/Services/GitManager";
 import { GitStatusBroadcaster } from "./git/Services/GitStatusBroadcaster";
@@ -491,6 +492,26 @@ export const makeWsRpcLayer = () =>
             "Failed to refresh providers",
           ),
         [WS_METHODS.serverListWorktrees]: () => Effect.succeed({ worktrees: [] }),
+        [WS_METHODS.serverListLegacyDataSources]: () =>
+          rpcEffect(
+            Effect.gen(function* () {
+              const config = yield* ServerConfig;
+              return yield* listLegacyDataSources({
+                homeDir: config.homeDir,
+                currentDbPath: config.dbPath,
+                devUrl: config.devUrl,
+              });
+            }),
+            "Failed to list legacy data sources",
+          ),
+        [WS_METHODS.serverImportLegacyData]: (input) =>
+          rpcEffect(
+            importLegacyProjectThreads({
+              sourceDbPath: input.sourceDbPath,
+              orchestrationEngine,
+            }),
+            "Failed to import legacy data",
+          ),
         [WS_METHODS.serverGetProviderUsageSnapshot]: (input) =>
           rpcEffect(getProviderUsageSnapshot(input), "Failed to load provider usage"),
         [WS_METHODS.serverTranscribeVoice]: (input) =>

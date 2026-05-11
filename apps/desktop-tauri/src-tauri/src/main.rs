@@ -18,6 +18,7 @@ fn main() {
             bridge::confirm,
             bridge::open_external,
             bridge::show_in_folder,
+            bridge::close_window,
         ])
         .setup(|app| {
             let repo_root = paths::repo_root_from_manifest_dir();

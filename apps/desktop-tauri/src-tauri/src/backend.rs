@@ -55,8 +55,9 @@ struct BackendInner {
 
 #[derive(Debug, Eq, PartialEq)]
 struct BackendCommandSpec {
+    executable: &'static str,
     current_dir: PathBuf,
-    args: [&'static str; 4],
+    args: [&'static str; 1],
 }
 
 impl BackendState {
@@ -111,7 +112,7 @@ pub async fn start_backend(state: BackendState, config: BackendConfig) -> Result
 
         let home_dir = config.home_dir.to_string_lossy().to_string();
         let command_spec = backend_command_spec(&config);
-        let mut command = Command::new("bun");
+        let mut command = Command::new(command_spec.executable);
         command
             .args(command_spec.args)
             .current_dir(command_spec.current_dir)
@@ -177,8 +178,9 @@ pub async fn stop_backend(state: BackendState) -> Result<(), BackendError> {
 
 fn backend_command_spec(config: &BackendConfig) -> BackendCommandSpec {
     BackendCommandSpec {
+        executable: "node",
         current_dir: config.repo_root.clone(),
-        args: ["run", "--cwd", "apps/server", "dev"],
+        args: ["apps/server/dist/index.mjs"],
     }
 }
 
@@ -370,8 +372,9 @@ mod tests {
 
         let command = backend_command_spec(&config);
 
+        assert_eq!(command.executable, "node");
         assert_eq!(command.current_dir, PathBuf::from("/tmp/brocode"));
-        assert_eq!(command.args, ["run", "--cwd", "apps/server", "dev"]);
+        assert_eq!(command.args, ["apps/server/dist/index.mjs"]);
     }
 
     #[test]

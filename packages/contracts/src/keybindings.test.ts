@@ -95,6 +95,18 @@ it.effect("parses keybinding rules", () =>
     });
     assert.strictEqual(parsedNewChat.command, "chat.newChat");
 
+    const parsedCloseSplitPane = yield* decode(KeybindingRule, {
+      key: "mod+w",
+      command: "chat.closeActiveSplitPane",
+    });
+    assert.strictEqual(parsedCloseSplitPane.command, "chat.closeActiveSplitPane");
+
+    const parsedCloseChat = yield* decode(KeybindingRule, {
+      key: "mod+w",
+      command: "chat.closeActive",
+    });
+    assert.strictEqual(parsedCloseChat.command, "chat.closeActive");
+
     const parsedLatestProject = yield* decode(KeybindingRule, {
       key: "mod+shift+n",
       command: "chat.newLatestProject",

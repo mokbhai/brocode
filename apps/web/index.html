@@ -38,8 +38,7 @@
       .app-boot-splash__icon {
         width: 112px;
         height: 112px;
-        border-radius: 26px; /* ~23% — macOS squircle-ish */
-        object-fit: cover;
+        object-fit: contain;
         opacity: 0;
         transform: scale(0.96);
         animation:
@@ -73,7 +72,12 @@
   <body>
     <div id="root">
       <div class="app-boot-splash" aria-hidden="true">
-        <img class="app-boot-splash__icon" src="/brocode.png" alt="" draggable="false" />
+        <img
+          class="app-boot-splash__icon"
+          src="/brocode-bracket-pop.svg"
+          alt=""
+          draggable="false"
+        />
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

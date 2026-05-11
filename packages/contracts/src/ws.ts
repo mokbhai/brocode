@@ -62,6 +62,7 @@ import { FilesystemBrowseInput } from "./filesystem";
 import { OpenInEditorInput } from "./editor";
 import {
   ServerConfigUpdatedPayload,
+  ServerImportLegacyDataInput,
   ServerLifecycleStreamEvent,
   ServerUpdateSettingsInput,
   ServerGetProviderUsageSnapshotInput,
@@ -134,6 +135,8 @@ export const WS_METHODS = {
   serverUpdateSettings: "server.updateSettings",
   serverRefreshProviders: "server.refreshProviders",
   serverListWorktrees: "server.listWorktrees",
+  serverListLegacyDataSources: "server.listLegacyDataSources",
+  serverImportLegacyData: "server.importLegacyData",
   serverGetProviderUsageSnapshot: "server.getProviderUsageSnapshot",
   serverTranscribeVoice: "server.transcribeVoice",
   serverUpsertKeybinding: "server.upsertKeybinding",
@@ -248,6 +251,8 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.serverUpdateSettings, ServerUpdateSettingsInput),
   tagRequestBody(WS_METHODS.serverRefreshProviders, Schema.Struct({})),
   tagRequestBody(WS_METHODS.serverListWorktrees, Schema.Struct({})),
+  tagRequestBody(WS_METHODS.serverListLegacyDataSources, Schema.Struct({})),
+  tagRequestBody(WS_METHODS.serverImportLegacyData, ServerImportLegacyDataInput),
   tagRequestBody(WS_METHODS.serverGetProviderUsageSnapshot, ServerGetProviderUsageSnapshotInput),
   tagRequestBody(WS_METHODS.serverTranscribeVoice, ServerVoiceTranscriptionInput),
   tagRequestBody(WS_METHODS.serverUpsertKeybinding, KeybindingRule),

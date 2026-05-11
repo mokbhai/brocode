@@ -81,6 +81,46 @@ export const ServerListWorktreesResult = Schema.Struct({
 });
 export type ServerListWorktreesResult = typeof ServerListWorktreesResult.Type;
 
+export const ServerLegacyDataSourceKind = Schema.Literals(["dpcode", "t3code", "custom"]);
+export type ServerLegacyDataSourceKind = typeof ServerLegacyDataSourceKind.Type;
+
+export const ServerLegacyDataSource = Schema.Struct({
+  kind: ServerLegacyDataSourceKind,
+  label: TrimmedNonEmptyString,
+  dbPath: TrimmedNonEmptyString,
+  stateDir: TrimmedNonEmptyString,
+  exists: Schema.Boolean,
+  projectCount: NonNegativeInt,
+  threadCount: NonNegativeInt,
+  messageCount: NonNegativeInt,
+  error: Schema.optional(Schema.String),
+});
+export type ServerLegacyDataSource = typeof ServerLegacyDataSource.Type;
+
+export const ServerListLegacyDataSourcesResult = Schema.Struct({
+  sources: Schema.Array(ServerLegacyDataSource),
+});
+export type ServerListLegacyDataSourcesResult = typeof ServerListLegacyDataSourcesResult.Type;
+
+export const ServerImportLegacyDataInput = Schema.Struct({
+  sourceDbPath: TrimmedNonEmptyString,
+});
+export type ServerImportLegacyDataInput = typeof ServerImportLegacyDataInput.Type;
+
+export const ServerImportLegacyDataResult = Schema.Struct({
+  sourceDbPath: TrimmedNonEmptyString,
+  sourceProjectCount: NonNegativeInt,
+  sourceThreadCount: NonNegativeInt,
+  sourceMessageCount: NonNegativeInt,
+  projectsCreated: NonNegativeInt,
+  projectsReused: NonNegativeInt,
+  threadsCreated: NonNegativeInt,
+  threadsSkipped: NonNegativeInt,
+  messagesImported: NonNegativeInt,
+  messagesSkipped: NonNegativeInt,
+});
+export type ServerImportLegacyDataResult = typeof ServerImportLegacyDataResult.Type;
+
 export const ServerProviderUsageLimit = Schema.Struct({
   window: TrimmedNonEmptyString,
   usedPercent: Schema.optional(
