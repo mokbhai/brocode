@@ -1,11 +1,14 @@
 import {
   ORCHESTRATION_WS_CHANNELS,
   ORCHESTRATION_WS_METHODS,
+  KANBAN_WS_CHANNELS,
+  KANBAN_WS_METHODS,
   WS_CHANNELS,
   WS_METHODS,
   WsRpcGroup,
   type GitActionProgressEvent,
   type GitRunStackedActionResult,
+  type KanbanEvent,
   type OrchestrationEvent,
   type OrchestrationShellStreamItem,
   type OrchestrationThreadStreamItem,
@@ -97,6 +100,7 @@ export class WsTransport {
   private readonly stoppingStreams = new Set<string>();
   private shellSubscribed = false;
   private readonly threadSubscriptions = new Map<string, unknown>();
+  private readonly boardSubscriptions = new Map<string, unknown>();
 
   constructor(url?: string) {
     this.explicitUrl = url ?? null;
@@ -140,9 +144,22 @@ export class WsTransport {
       this.stopStream(`orchestration.thread:${threadId}`);
       return undefined as T;
     }
+    if (method === KANBAN_WS_METHODS.subscribeBoard) {
+      const boardId = (params as { boardId: string }).boardId;
+      this.boardSubscriptions.set(boardId, params);
+      this.startBoardStream(client, boardId, params as never);
+      return undefined as T;
+    }
+    if (method === KANBAN_WS_METHODS.unsubscribeBoard) {
+      const boardId = (params as { boardId: string }).boardId;
+      this.boardSubscriptions.delete(boardId);
+      this.stopStream(`kanban.board:${boardId}`);
+      return undefined as T;
+    }
 
     const rpcInput =
-      method === ORCHESTRATION_WS_METHODS.dispatchCommand
+      method === ORCHESTRATION_WS_METHODS.dispatchCommand ||
+      method === KANBAN_WS_METHODS.dispatchCommand
         ? (params as { command: unknown }).command
         : (params ?? {});
     const call = (
@@ -269,6 +286,9 @@ export class WsTransport {
     }
     for (const [threadId, input] of this.threadSubscriptions) {
       this.startThreadStream(client, threadId, input);
+    }
+    for (const [boardId, input] of this.boardSubscriptions) {
+      this.startBoardStream(client, boardId, input);
     }
     return client;
   }
@@ -426,6 +446,23 @@ export class WsTransport {
       (event: OrchestrationThreadStreamItem) =>
         this.emit(ORCHESTRATION_WS_CHANNELS.threadEvent, event),
       restartThread,
+    );
+  }
+
+  private startBoardStream(client: RpcClientInstance, boardId: string, input: unknown): void {
+    const key = `kanban.board:${boardId}`;
+    this.stopStream(key);
+    this.stoppingStreams.delete(key);
+    const restartBoard = () => {
+      void this.getClient()
+        .then((nextClient) => this.startBoardStream(nextClient, boardId, input))
+        .catch((error) => console.warn("WebSocket RPC board stream failed to restart", error));
+    };
+    this.startStream(
+      key,
+      client[KANBAN_WS_METHODS.subscribeBoard](input as never),
+      (event: KanbanEvent) => this.emit(KANBAN_WS_CHANNELS.boardEvent, event),
+      restartBoard,
     );
   }
 

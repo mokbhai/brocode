@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 
 import {
   CommandId,
+  KANBAN_WS_METHODS,
   ORCHESTRATION_WS_METHODS,
   ThreadId,
   WS_METHODS,
@@ -248,6 +249,10 @@ export const makeWsRpcLayer = () =>
 
       const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
         effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+      const kanbanUnavailable = () =>
+        new WsRpcError({
+          message: "Kanban RPC is not available until the Kanban engine is initialized",
+        });
 
       return WsRpcGroup.of({
         [ORCHESTRATION_WS_METHODS.dispatchCommand]: (command) =>
@@ -346,6 +351,10 @@ export const makeWsRpcLayer = () =>
         [ORCHESTRATION_WS_METHODS.unsubscribeThread]: () => Effect.void,
         [WS_METHODS.subscribeOrchestrationDomainEvents]: () =>
           orchestrationEngine.streamDomainEvents,
+        [KANBAN_WS_METHODS.getSnapshot]: () => Effect.fail(kanbanUnavailable()),
+        [KANBAN_WS_METHODS.dispatchCommand]: () => Effect.fail(kanbanUnavailable()),
+        [KANBAN_WS_METHODS.subscribeBoard]: () => Stream.fail(kanbanUnavailable()),
+        [KANBAN_WS_METHODS.unsubscribeBoard]: () => Effect.fail(kanbanUnavailable()),
 
         [WS_METHODS.projectsListDirectories]: (input) =>
           rpcEffect(

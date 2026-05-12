@@ -1,7 +1,7 @@
 import { assert, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
-import { KANBAN_WS_METHODS } from "./kanban";
+import { KANBAN_WS_CHANNELS, KANBAN_WS_METHODS } from "./kanban";
 import { ORCHESTRATION_WS_CHANNELS, ORCHESTRATION_WS_METHODS } from "./orchestration";
 import { WebSocketRequest, WsResponse, WS_CHANNELS, WS_METHODS } from "./ws";
 
@@ -92,6 +92,67 @@ it.effect("accepts kanban.getSnapshot requests", () =>
     });
 
     assert.strictEqual(parsed.body._tag, KANBAN_WS_METHODS.getSnapshot);
+  }),
+);
+
+it.effect("accepts kanban.dispatchCommand requests with a client command envelope", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decode(WebSocketRequest, {
+      id: "req-kanban-dispatch-1",
+      body: {
+        _tag: KANBAN_WS_METHODS.dispatchCommand,
+        command: {
+          type: "kanban.board.create",
+          commandId: "cmd_1",
+          boardId: "board_1",
+          projectId: "project_1",
+          title: "Implementation board",
+          createdAt: "2026-05-12T00:00:00.000Z",
+        },
+      },
+    });
+
+    assert.strictEqual(parsed.body._tag, KANBAN_WS_METHODS.dispatchCommand);
+    if (parsed.body._tag === KANBAN_WS_METHODS.dispatchCommand) {
+      assert.strictEqual(parsed.body.command.type, "kanban.board.create");
+    }
+  }),
+);
+
+it.effect("accepts kanban.boardEvent push envelopes", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decode(WsResponse, {
+      type: "push",
+      sequence: 4,
+      channel: KANBAN_WS_CHANNELS.boardEvent,
+      data: {
+        sequence: 1,
+        eventId: "event_1",
+        aggregateKind: "board",
+        aggregateId: "board_1",
+        occurredAt: "2026-05-12T00:00:00.000Z",
+        commandId: "cmd_1",
+        causationEventId: null,
+        correlationId: "cmd_1",
+        metadata: {},
+        type: "kanban.board.created",
+        payload: {
+          board: {
+            id: "board_1",
+            projectId: "project_1",
+            title: "Implementation board",
+            createdAt: "2026-05-12T00:00:00.000Z",
+            updatedAt: "2026-05-12T00:00:00.000Z",
+          },
+        },
+      },
+    });
+
+    if (!("type" in parsed) || parsed.type !== "push") {
+      assert.fail("expected websocket response to decode as a push envelope");
+    }
+
+    assert.strictEqual(parsed.channel, KANBAN_WS_CHANNELS.boardEvent);
   }),
 );
 

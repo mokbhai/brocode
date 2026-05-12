@@ -2,6 +2,10 @@ import {
   CommandId,
   type ContextMenuItem,
   EventId,
+  KANBAN_WS_CHANNELS,
+  KANBAN_WS_METHODS,
+  KanbanBoardId,
+  type KanbanEvent,
   ORCHESTRATION_WS_CHANNELS,
   ORCHESTRATION_WS_METHODS,
   type OrchestrationEvent,
@@ -396,6 +400,58 @@ describe("wsNativeApi", () => {
     expect(requestMock).toHaveBeenCalledWith(ORCHESTRATION_WS_METHODS.dispatchCommand, {
       command,
     });
+  });
+
+  it("wraps kanban dispatch commands in the command envelope", async () => {
+    requestMock.mockResolvedValue({ sequence: 1 });
+    const { createWsNativeApi } = await import("./wsNativeApi");
+
+    const api = createWsNativeApi();
+    const command = {
+      type: "kanban.board.create",
+      commandId: CommandId.makeUnsafe("cmd-1"),
+      boardId: KanbanBoardId.makeUnsafe("board-1"),
+      projectId: ProjectId.makeUnsafe("project-1"),
+      title: "Implementation board",
+      createdAt: "2026-05-12T00:00:00.000Z",
+    } as const;
+    await api.kanban.dispatchCommand(command);
+
+    expect(requestMock).toHaveBeenCalledWith(KANBAN_WS_METHODS.dispatchCommand, { command });
+  });
+
+  it("forwards kanban board events to registered listeners", async () => {
+    const { createWsNativeApi } = await import("./wsNativeApi");
+
+    const api = createWsNativeApi();
+    const onBoardEvent = vi.fn();
+    api.kanban.onBoardEvent(onBoardEvent);
+
+    const event = {
+      sequence: 1,
+      eventId: EventId.makeUnsafe("event-1"),
+      aggregateKind: "board",
+      aggregateId: KanbanBoardId.makeUnsafe("board-1"),
+      occurredAt: "2026-05-12T00:00:00.000Z",
+      commandId: CommandId.makeUnsafe("cmd-1"),
+      causationEventId: null,
+      correlationId: CommandId.makeUnsafe("cmd-1"),
+      metadata: {},
+      type: "kanban.board.created",
+      payload: {
+        board: {
+          id: KanbanBoardId.makeUnsafe("board-1"),
+          projectId: ProjectId.makeUnsafe("project-1"),
+          title: "Implementation board",
+          createdAt: "2026-05-12T00:00:00.000Z",
+          updatedAt: "2026-05-12T00:00:00.000Z",
+        },
+      },
+    } satisfies Extract<KanbanEvent, { type: "kanban.board.created" }>;
+    emitPush(KANBAN_WS_CHANNELS.boardEvent, event);
+
+    expect(onBoardEvent).toHaveBeenCalledTimes(1);
+    expect(onBoardEvent).toHaveBeenCalledWith(event);
   });
 
   it("forwards workspace file writes to the websocket project method", async () => {
