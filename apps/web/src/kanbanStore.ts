@@ -24,22 +24,8 @@ import {
 } from "@t3tools/contracts";
 import { create } from "zustand";
 
+import { KANBAN_CARD_STATUSES } from "./kanbanStatus";
 import { ensureNativeApi } from "./nativeApi";
-
-export const KANBAN_CARD_STATUSES: readonly KanbanCardStatus[] = [
-  "draft",
-  "ready",
-  "implementing",
-  "reviewing",
-  "needs_work",
-  "approved",
-  "ready_to_submit",
-  "submitted",
-  "blocked",
-  "loop_limit_reached",
-  "agent_error",
-  "review_inconclusive",
-];
 
 export type KanbanCardsByStatus = Record<KanbanCardStatus, KanbanCard[]>;
 

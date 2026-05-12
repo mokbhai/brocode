@@ -5,7 +5,7 @@
 
 import type { KanbanCard, KanbanCardStatus, KanbanTask } from "@t3tools/contracts";
 
-import { KANBAN_CARD_STATUSES } from "../../kanbanStore";
+import { getKanbanCardStatusTitle, KANBAN_CARD_STATUSES } from "../../kanbanStatus";
 
 export type KanbanCardBadgeTone = "blocked" | "error" | "warning";
 
@@ -32,23 +32,8 @@ export interface KanbanColumnViewModel {
 
 export type KanbanTasksByCardId = Readonly<Record<string, readonly KanbanTask[] | undefined>>;
 
-const STATUS_TITLES: Record<KanbanCardStatus, string> = {
-  draft: "Draft",
-  ready: "Ready",
-  implementing: "Implementing",
-  reviewing: "Reviewing",
-  needs_work: "Needs Work",
-  approved: "Approved",
-  ready_to_submit: "Ready to Submit",
-  submitted: "Submitted",
-  blocked: "Blocked",
-  loop_limit_reached: "Loop Limit Reached",
-  agent_error: "Agent Error",
-  review_inconclusive: "Review Inconclusive",
-};
-
 export function getKanbanColumnTitle(status: KanbanCardStatus): string {
-  return STATUS_TITLES[status];
+  return getKanbanCardStatusTitle(status);
 }
 
 export function formatKanbanCardProgress(
