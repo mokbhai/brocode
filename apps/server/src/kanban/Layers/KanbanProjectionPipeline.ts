@@ -205,9 +205,8 @@ const makeKanbanProjectionPipeline = Effect.gen(function* () {
         ${task.createdAt},
         ${task.updatedAt}
       )
-      ON CONFLICT (task_id)
+      ON CONFLICT (card_id, task_id)
       DO UPDATE SET
-        card_id = excluded.card_id,
         title = excluded.title,
         description = excluded.description,
         status = excluded.status,
@@ -384,7 +383,10 @@ const makeKanbanProjectionPipeline = Effect.gen(function* () {
 
   const bootstrap: KanbanProjectionPipelineShape["bootstrap"] = Effect.gen(function* () {
     const cursor = yield* readCursor;
-    yield* Stream.runForEach(eventStore.readFromSequence(cursor), projectEvent);
+    yield* Stream.runForEach(
+      eventStore.readFromSequence(cursor, Number.MAX_SAFE_INTEGER),
+      projectEvent,
+    );
   });
 
   return {

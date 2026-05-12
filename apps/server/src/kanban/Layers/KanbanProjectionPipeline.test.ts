@@ -252,4 +252,170 @@ describe("KanbanProjectionPipeline", () => {
 
     await system.dispose();
   });
+
+  it("keeps tasks with the same task id on different cards as separate rows", async () => {
+    const system = await createProjectionSystem();
+    const createdAt = "2026-05-12T00:05:00.000Z";
+    const sharedTaskId = KanbanTaskId.makeUnsafe("shared-task-id");
+    const firstCardId = KanbanCardId.makeUnsafe("card-composite-task-a");
+    const secondCardId = KanbanCardId.makeUnsafe("card-composite-task-b");
+
+    const makeCard = (id: KanbanCardId, title: string) => ({
+      id,
+      boardId,
+      projectId,
+      sourceThreadId: null,
+      workerThreadIds: [],
+      reviewerThreadIds: [],
+      title,
+      specPath: "docs/composite-task.md",
+      status: "draft" as const,
+      modelSelection: {
+        provider: "codex",
+        model: "gpt-5-codex",
+      },
+      runtimeMode: "approval-required" as const,
+      branch: null,
+      worktreePath: null,
+      associatedWorktreePath: null,
+      associatedWorktreeBranch: null,
+      associatedWorktreeRef: null,
+      blockerReason: null,
+      loopCount: 0,
+      maxLoopCount: 3,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    const firstEvent = await system.run(
+      system.eventStore.append({
+        ...eventBase({
+          eventId: "evt-kanban-composite-task-a",
+          aggregateKind: "card",
+          aggregateId: firstCardId,
+          commandId: "cmd-kanban-composite-task-a",
+          occurredAt: createdAt,
+        }),
+        type: "kanban.card.created",
+        payload: {
+          card: makeCard(firstCardId, "Composite Task Card A"),
+          tasks: [
+            {
+              id: sharedTaskId,
+              cardId: firstCardId,
+              title: "Shared task on A",
+              status: "todo",
+              order: 0,
+              createdAt,
+              updatedAt: createdAt,
+            },
+          ],
+        },
+      }),
+    );
+    const secondEvent = await system.run(
+      system.eventStore.append({
+        ...eventBase({
+          eventId: "evt-kanban-composite-task-b",
+          aggregateKind: "card",
+          aggregateId: secondCardId,
+          commandId: "cmd-kanban-composite-task-b",
+          occurredAt: createdAt,
+        }),
+        type: "kanban.card.created",
+        payload: {
+          card: makeCard(secondCardId, "Composite Task Card B"),
+          tasks: [
+            {
+              id: sharedTaskId,
+              cardId: secondCardId,
+              title: "Shared task on B",
+              status: "todo",
+              order: 0,
+              createdAt,
+              updatedAt: createdAt,
+            },
+          ],
+        },
+      }),
+    );
+
+    await system.run(system.pipeline.bootstrap);
+
+    const tasks = await system.run(
+      system.sql<{ readonly taskId: string; readonly cardId: string; readonly title: string }>`
+        SELECT task_id AS "taskId", card_id AS "cardId", title
+        FROM projection_kanban_tasks
+        ORDER BY card_id ASC
+      `,
+    );
+    expect(tasks).toEqual([
+      { taskId: sharedTaskId, cardId: firstCardId, title: "Shared task on A" },
+      { taskId: sharedTaskId, cardId: secondCardId, title: "Shared task on B" },
+    ]);
+
+    const state = await system.run(
+      system.sql<{ readonly lastAppliedSequence: number }>`
+        SELECT last_applied_sequence AS "lastAppliedSequence"
+        FROM projection_kanban_state
+        WHERE projector = 'kanban.projection'
+      `,
+    );
+    expect(firstEvent.sequence).toBeLessThan(secondEvent.sequence);
+    expect(state).toEqual([{ lastAppliedSequence: secondEvent.sequence }]);
+
+    await system.dispose();
+  });
+
+  it("bootstraps every persisted event after the cursor instead of the first default page", async () => {
+    const system = await createProjectionSystem();
+    const createdAt = "2026-05-12T00:06:00.000Z";
+
+    let lastSequence = 0;
+    for (let index = 0; index < 1_001; index += 1) {
+      const board = KanbanBoardId.makeUnsafe(`board-unbounded-${index}`);
+      const event = await system.run(
+        system.eventStore.append({
+          ...eventBase({
+            eventId: `evt-kanban-unbounded-${index}`,
+            aggregateKind: "board",
+            aggregateId: board,
+            commandId: `cmd-kanban-unbounded-${index}`,
+            occurredAt: createdAt,
+          }),
+          type: "kanban.board.created",
+          payload: {
+            board: {
+              id: board,
+              projectId,
+              title: `Unbounded Board ${index}`,
+              createdAt,
+              updatedAt: createdAt,
+            },
+          },
+        }),
+      );
+      lastSequence = event.sequence;
+    }
+
+    await system.run(system.pipeline.bootstrap);
+
+    const boards = await system.run(
+      system.sql<{ readonly count: number }>`
+        SELECT COUNT(*) AS count
+        FROM projection_kanban_boards
+      `,
+    );
+    const state = await system.run(
+      system.sql<{ readonly lastAppliedSequence: number }>`
+        SELECT last_applied_sequence AS "lastAppliedSequence"
+        FROM projection_kanban_state
+        WHERE projector = 'kanban.projection'
+      `,
+    );
+    expect(boards).toEqual([{ count: 1_001 }]);
+    expect(state).toEqual([{ lastAppliedSequence: lastSequence }]);
+
+    await system.dispose();
+  });
 });

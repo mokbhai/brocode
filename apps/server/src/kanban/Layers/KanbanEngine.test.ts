@@ -8,6 +8,7 @@ import {
   type KanbanEvent,
 } from "@t3tools/contracts";
 import { Effect, Layer, ManagedRuntime, Queue, Stream } from "effect";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { describe, expect, it } from "vitest";
 
 import { SqlitePersistenceMemory } from "../../persistence/Layers/Sqlite.ts";
@@ -23,12 +24,14 @@ const taskId = KanbanTaskId.makeUnsafe("task-kanban-engine");
 async function createKanbanSystem() {
   const layer = KanbanEngineLive.pipe(
     Layer.provide(KanbanEventStoreLive),
-    Layer.provide(SqlitePersistenceMemory),
+    Layer.provideMerge(SqlitePersistenceMemory),
   );
   const runtime = ManagedRuntime.make(layer);
   const engine = await runtime.runPromise(Effect.service(KanbanEngineService));
+  const sql = await runtime.runPromise(Effect.service(SqlClient.SqlClient));
   return {
     engine,
+    sql,
     run: <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(effect),
     dispose: () => runtime.dispose(),
   };
@@ -126,6 +129,37 @@ describe("KanbanEngine", () => {
       "kanban.board.created",
       "kanban.card.created",
     ]);
+
+    await system.dispose();
+  });
+
+  it("stores Kanban events and receipts without polluting orchestration tables", async () => {
+    const system = await createKanbanSystem();
+    const createdAt = "2026-05-12T00:04:00.000Z";
+
+    await system.run(
+      system.engine.dispatch(boardCreate("cmd-kanban-storage-isolation-board", createdAt)),
+    );
+
+    const kanbanEvents = await system.run(
+      system.sql<{ readonly count: number }>`SELECT COUNT(*) AS count FROM kanban_events`,
+    );
+    const orchestrationEvents = await system.run(
+      system.sql<{ readonly count: number }>`SELECT COUNT(*) AS count FROM orchestration_events`,
+    );
+    const kanbanReceipts = await system.run(
+      system.sql<{ readonly count: number }>`SELECT COUNT(*) AS count FROM kanban_command_receipts`,
+    );
+    const orchestrationReceipts = await system.run(
+      system.sql<{ readonly count: number }>`
+        SELECT COUNT(*) AS count FROM orchestration_command_receipts
+      `,
+    );
+
+    expect(kanbanEvents).toEqual([{ count: 1 }]);
+    expect(orchestrationEvents).toEqual([{ count: 0 }]);
+    expect(kanbanReceipts).toEqual([{ count: 1 }]);
+    expect(orchestrationReceipts).toEqual([{ count: 0 }]);
 
     await system.dispose();
   });

@@ -5,6 +5,66 @@ export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
   yield* sql`
+    CREATE TABLE IF NOT EXISTS kanban_events (
+      sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id TEXT NOT NULL UNIQUE,
+      aggregate_kind TEXT NOT NULL,
+      stream_id TEXT NOT NULL,
+      stream_version INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      command_id TEXT,
+      causation_event_id TEXT,
+      correlation_id TEXT,
+      actor_kind TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      metadata_json TEXT NOT NULL
+    )
+  `;
+
+  yield* sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_kanban_events_stream_version
+    ON kanban_events(aggregate_kind, stream_id, stream_version)
+  `;
+
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_kanban_events_stream_sequence
+    ON kanban_events(aggregate_kind, stream_id, sequence)
+  `;
+
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_kanban_events_command_id
+    ON kanban_events(command_id)
+  `;
+
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_kanban_events_correlation_id
+    ON kanban_events(correlation_id)
+  `;
+
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS kanban_command_receipts (
+      command_id TEXT PRIMARY KEY,
+      aggregate_kind TEXT NOT NULL,
+      aggregate_id TEXT NOT NULL,
+      accepted_at TEXT NOT NULL,
+      result_sequence INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT
+    )
+  `;
+
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_kanban_command_receipts_aggregate
+    ON kanban_command_receipts(aggregate_kind, aggregate_id)
+  `;
+
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_kanban_command_receipts_sequence
+    ON kanban_command_receipts(result_sequence)
+  `;
+
+  yield* sql`
     CREATE TABLE IF NOT EXISTS projection_kanban_boards (
       board_id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -44,14 +104,15 @@ export default Effect.gen(function* () {
 
   yield* sql`
     CREATE TABLE IF NOT EXISTS projection_kanban_tasks (
-      task_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
       card_id TEXT NOT NULL,
       title TEXT NOT NULL,
       description TEXT,
       status TEXT NOT NULL,
       task_order INTEGER NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (card_id, task_id)
     )
   `;
 

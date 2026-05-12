@@ -81,7 +81,7 @@ const makeKanbanEventStore = Effect.gen(function* () {
     Result: KanbanEventPersistedRowSchema,
     execute: (request) =>
       sql`
-        INSERT INTO orchestration_events (
+        INSERT INTO kanban_events (
           event_id,
           aggregate_kind,
           stream_id,
@@ -102,7 +102,7 @@ const makeKanbanEventStore = Effect.gen(function* () {
           COALESCE(
             (
               SELECT stream_version + 1
-              FROM orchestration_events
+              FROM kanban_events
               WHERE aggregate_kind = ${request.aggregateKind}
                 AND stream_id = ${request.streamId}
               ORDER BY stream_version DESC
@@ -151,7 +151,7 @@ const makeKanbanEventStore = Effect.gen(function* () {
           correlation_id AS "correlationId",
           payload_json AS "payload",
           metadata_json AS "metadata"
-        FROM orchestration_events
+        FROM kanban_events
         WHERE sequence > ${request.sequenceExclusive}
           AND aggregate_kind IN ('board', 'card')
         ORDER BY sequence ASC
@@ -163,7 +163,7 @@ const makeKanbanEventStore = Effect.gen(function* () {
     Request: KanbanCommandReceipt,
     execute: (receipt) =>
       sql`
-        INSERT INTO orchestration_command_receipts (
+        INSERT INTO kanban_command_receipts (
           command_id,
           aggregate_kind,
           aggregate_id,
@@ -205,7 +205,7 @@ const makeKanbanEventStore = Effect.gen(function* () {
           result_sequence AS "resultSequence",
           status,
           error
-        FROM orchestration_command_receipts
+        FROM kanban_command_receipts
         WHERE command_id = ${commandId}
           AND aggregate_kind IN ('board', 'card')
       `,
