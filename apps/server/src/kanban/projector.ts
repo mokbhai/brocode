@@ -69,6 +69,15 @@ function upsertById<T extends { readonly id: string }>(
     : [...entries, next];
 }
 
+function upsertTask(
+  tasks: ReadonlyArray<KanbanTask>,
+  next: KanbanTask,
+): ReadonlyArray<KanbanTask> {
+  return tasks.some((task) => task.cardId === next.cardId && task.id === next.id)
+    ? tasks.map((task) => (task.cardId === next.cardId && task.id === next.id ? next : task))
+    : [...tasks, next];
+}
+
 function updateCard(
   cards: ReadonlyArray<KanbanCard>,
   cardId: KanbanCardId,
@@ -99,7 +108,7 @@ function upsertTasks(
   tasks: ReadonlyArray<KanbanTask>,
   nextTasks: ReadonlyArray<KanbanTask>,
 ): ReadonlyArray<KanbanTask> {
-  return nextTasks.reduce((current, task) => upsertById(current, task), tasks);
+  return nextTasks.reduce((current, task) => upsertTask(current, task), tasks);
 }
 
 export function createEmptyKanbanReadModel(nowIso: string): KanbanReadModel {
@@ -166,7 +175,7 @@ export function projectKanbanEvent(
       return decodeForEvent(KanbanTaskUpsertedPayload, event.payload, event.type).pipe(
         Effect.map((payload) => ({
           ...nextBase,
-          tasks: upsertById(nextBase.tasks, payload.task),
+          tasks: upsertTask(nextBase.tasks, payload.task),
         })),
       );
 

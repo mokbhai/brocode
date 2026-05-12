@@ -250,6 +250,24 @@ function targetStatusForRunStart(
   return command.role === "worker" ? "implementing" : "reviewing";
 }
 
+function reviewOutcomeStatus(
+  review: Extract<KanbanCommand, { readonly type: "kanban.review.complete" }>["review"],
+): {
+  readonly toStatus: KanbanCardStatus;
+  readonly reason: string | null;
+} {
+  switch (review.outcome) {
+    case "approved":
+      return { toStatus: "approved", reason: null };
+    case "needs_work":
+      return { toStatus: "needs_work", reason: review.summary };
+    case "blocked":
+      return { toStatus: "blocked", reason: review.summary };
+    case "inconclusive":
+      return { toStatus: "review_inconclusive", reason: review.summary };
+  }
+}
+
 export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
   command,
   readModel,
@@ -425,6 +443,9 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
           `Run '${command.runId}' does not exist for card '${command.cardId}'.`,
         );
       }
+      if (run.status !== "running") {
+        return yield* fail(command, `Run '${command.runId}' is not running.`);
+      }
       return {
         ...eventBase({
           aggregateKind: "card",
@@ -445,23 +466,43 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
     }
 
     case "kanban.review.complete": {
-      yield* requireCard(command, readModel, command.review.cardId);
+      const card = yield* requireCard(command, readModel, command.review.cardId);
       const run = findRun(readModel, command.review.runId);
       if (run === undefined) {
         return yield* fail(command, `Run '${command.review.runId}' does not exist.`);
       }
-      return {
-        ...eventBase({
-          aggregateKind: "card",
-          aggregateId: command.review.cardId,
-          occurredAt: command.review.completedAt,
-          commandId: command.commandId,
+      if (run.cardId !== command.review.cardId) {
+        return yield* fail(
+          command,
+          `Run '${command.review.runId}' belongs to card '${run.cardId}', not '${command.review.cardId}'.`,
+        );
+      }
+      if (run.role !== "reviewer") {
+        return yield* fail(command, `Run '${command.review.runId}' is not a reviewer run.`);
+      }
+      const outcome = reviewOutcomeStatus(command.review);
+      yield* requireStatusTransition(command, card.status, outcome.toStatus);
+      return [
+        statusChangedEvent({
+          command,
+          card,
+          toStatus: outcome.toStatus,
+          reason: outcome.reason,
+          updatedAt: command.review.completedAt,
         }),
-        type: "kanban.review.completed",
-        payload: {
-          review: command.review,
+        {
+          ...eventBase({
+            aggregateKind: "card",
+            aggregateId: command.review.cardId,
+            occurredAt: command.review.completedAt,
+            commandId: command.commandId,
+          }),
+          type: "kanban.review.completed",
+          payload: {
+            review: command.review,
+          },
         },
-      };
+      ];
     }
 
     case "kanban.card.block": {

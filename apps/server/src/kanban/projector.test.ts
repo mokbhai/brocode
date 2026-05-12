@@ -6,6 +6,7 @@ import {
   KanbanTaskId,
   ProjectId,
   type KanbanEvent,
+  type KanbanTask,
 } from "@t3tools/contracts";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
@@ -14,6 +15,7 @@ import { createEmptyKanbanReadModel, projectKanbanEvent } from "./projector.ts";
 
 const boardId = KanbanBoardId.makeUnsafe("board_1");
 const cardId = KanbanCardId.makeUnsafe("card_1");
+const otherCardId = KanbanCardId.makeUnsafe("card_2");
 const projectId = ProjectId.makeUnsafe("project_1");
 
 const eventBase = (
@@ -86,6 +88,16 @@ const cardCreated: KanbanEvent = {
   },
 };
 
+const taskWithCard = (cardId: KanbanCardId, title: string, updatedAt: string): KanbanTask => ({
+  id: KanbanTaskId.makeUnsafe("task_shared"),
+  cardId,
+  title,
+  status: "todo",
+  order: 0,
+  createdAt: updatedAt,
+  updatedAt,
+});
+
 describe("projectKanbanEvent", () => {
   it("replays board, card, task, and status events into an immutable read model", async () => {
     const initial = createEmptyKanbanReadModel("2026-05-12T00:00:00.000Z");
@@ -143,6 +155,37 @@ describe("projectKanbanEvent", () => {
         cardId,
         title: "Write projector",
         status: "in_progress",
+      }),
+    ]);
+  });
+
+  it("upserts tasks by card id and task id so different cards can share task ids", async () => {
+    const initial = {
+      ...createEmptyKanbanReadModel("2026-05-12T00:00:00.000Z"),
+      tasks: [taskWithCard(cardId, "Card one task", "2026-05-12T00:00:01.000Z")],
+    };
+
+    const next = await Effect.runPromise(
+      projectKanbanEvent(initial, {
+        ...eventBase(2, "kanban.task.upserted"),
+        aggregateId: otherCardId,
+        type: "kanban.task.upserted",
+        payload: {
+          task: taskWithCard(otherCardId, "Card two task", "2026-05-12T00:00:02.000Z"),
+        },
+      }),
+    );
+
+    expect(next.tasks).toEqual([
+      expect.objectContaining({
+        id: KanbanTaskId.makeUnsafe("task_shared"),
+        cardId,
+        title: "Card one task",
+      }),
+      expect.objectContaining({
+        id: KanbanTaskId.makeUnsafe("task_shared"),
+        cardId: otherCardId,
+        title: "Card two task",
       }),
     ]);
   });

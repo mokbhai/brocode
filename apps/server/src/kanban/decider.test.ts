@@ -2,6 +2,7 @@ import {
   CommandId,
   KanbanBoardId,
   KanbanCardId,
+  KanbanReviewId,
   KanbanRunId,
   KanbanTaskId,
   ProjectId,
@@ -20,6 +21,7 @@ import { createEmptyKanbanReadModel } from "./projector.ts";
 const now = "2026-05-12T00:00:00.000Z";
 const boardId = KanbanBoardId.makeUnsafe("board_1");
 const cardId = KanbanCardId.makeUnsafe("card_1");
+const otherCardId = KanbanCardId.makeUnsafe("card_2");
 const projectId = ProjectId.makeUnsafe("project_1");
 
 const runDecision = (command: KanbanCommand, readModel: KanbanReadModel) =>
@@ -68,6 +70,11 @@ const readyCard = (status: KanbanCard["status"] = "ready"): KanbanCard => ({
   maxLoopCount: 3,
   createdAt: now,
   updatedAt: now,
+});
+
+const cardWithId = (id: KanbanCardId, status: KanbanCard["status"] = "ready"): KanbanCard => ({
+  ...readyCard(status),
+  id,
 });
 
 describe("decideKanbanCommand", () => {
@@ -258,5 +265,188 @@ describe("decideKanbanCommand", () => {
     expect(exit._tag).toBe("Failure");
     expect(String(exit.cause)).toContain("submitted");
     expect(String(exit.cause)).toContain("implementing");
+  });
+
+  it("allows a worker run to start after a needs-work review outcome", async () => {
+    const result = await runDecision(
+      {
+        type: "kanban.run.start",
+        commandId: CommandId.makeUnsafe("cmd_retry_worker"),
+        runId: KanbanRunId.makeUnsafe("run_retry_worker"),
+        cardId,
+        role: "worker",
+        threadId: ThreadId.makeUnsafe("thread_worker_retry"),
+        startedAt: now,
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("needs_work")],
+      },
+    );
+
+    const events = asEvents(result);
+    expect(events.map((event) => event.type)).toEqual([
+      "kanban.card.status-changed",
+      "kanban.run.started",
+    ]);
+    expect(events[0]?.payload).toMatchObject({
+      cardId,
+      fromStatus: "needs_work",
+      toStatus: "implementing",
+    });
+  });
+
+  it("rejects review completion when the referenced run belongs to another card or is a worker run", async () => {
+    const otherCardRunExit = await runDecisionExit(
+      {
+        type: "kanban.review.complete",
+        commandId: CommandId.makeUnsafe("cmd_review_wrong_card"),
+        review: {
+          id: KanbanReviewId.makeUnsafe("review_wrong_card"),
+          cardId,
+          runId: KanbanRunId.makeUnsafe("run_other_card"),
+          reviewerThreadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+          outcome: "approved",
+          summary: "Looks ready",
+          findings: [],
+          completedAt: now,
+        },
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("reviewing"), cardWithId(otherCardId, "reviewing")],
+        runs: [
+          {
+            id: KanbanRunId.makeUnsafe("run_other_card"),
+            cardId: otherCardId,
+            role: "reviewer",
+            status: "completed",
+            threadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+            startedAt: now,
+            completedAt: now,
+          },
+        ],
+      },
+    );
+
+    const workerRunExit = await runDecisionExit(
+      {
+        type: "kanban.review.complete",
+        commandId: CommandId.makeUnsafe("cmd_review_worker_run"),
+        review: {
+          id: KanbanReviewId.makeUnsafe("review_worker_run"),
+          cardId,
+          runId: KanbanRunId.makeUnsafe("run_worker"),
+          reviewerThreadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+          outcome: "approved",
+          summary: "Looks ready",
+          findings: [],
+          completedAt: now,
+        },
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("reviewing")],
+        runs: [
+          {
+            id: KanbanRunId.makeUnsafe("run_worker"),
+            cardId,
+            role: "worker",
+            status: "completed",
+            threadId: ThreadId.makeUnsafe("thread_worker_1"),
+            startedAt: now,
+            completedAt: now,
+          },
+        ],
+      },
+    );
+
+    expect(otherCardRunExit._tag).toBe("Failure");
+    expect(String(otherCardRunExit.cause)).toContain("card");
+    expect(workerRunExit._tag).toBe("Failure");
+    expect(String(workerRunExit.cause)).toContain("reviewer");
+  });
+
+  it("emits a needs-work status change before recording a needs-work review", async () => {
+    const result = await runDecision(
+      {
+        type: "kanban.review.complete",
+        commandId: CommandId.makeUnsafe("cmd_review_needs_work"),
+        review: {
+          id: KanbanReviewId.makeUnsafe("review_needs_work"),
+          cardId,
+          runId: KanbanRunId.makeUnsafe("run_reviewer"),
+          reviewerThreadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+          outcome: "needs_work",
+          summary: "Revise the error handling",
+          findings: ["Handle duplicate completion"],
+          completedAt: now,
+        },
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("reviewing")],
+        runs: [
+          {
+            id: KanbanRunId.makeUnsafe("run_reviewer"),
+            cardId,
+            role: "reviewer",
+            status: "completed",
+            threadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+            startedAt: now,
+            completedAt: now,
+          },
+        ],
+      },
+    );
+
+    const events = asEvents(result);
+    expect(events.map((event) => event.type)).toEqual([
+      "kanban.card.status-changed",
+      "kanban.review.completed",
+    ]);
+    expect(events[0]?.payload).toMatchObject({
+      cardId,
+      fromStatus: "reviewing",
+      toStatus: "needs_work",
+      reason: "Revise the error handling",
+    });
+    expect(events[1]?.payload).toMatchObject({
+      review: {
+        id: KanbanReviewId.makeUnsafe("review_needs_work"),
+        outcome: "needs_work",
+      },
+    });
+  });
+
+  it("rejects repeated terminal run completion", async () => {
+    const exit = await runDecisionExit(
+      {
+        type: "kanban.run.complete",
+        commandId: CommandId.makeUnsafe("cmd_run_complete_again"),
+        runId: KanbanRunId.makeUnsafe("run_completed"),
+        cardId,
+        status: "completed",
+        completedAt: now,
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("reviewing")],
+        runs: [
+          {
+            id: KanbanRunId.makeUnsafe("run_completed"),
+            cardId,
+            role: "reviewer",
+            status: "completed",
+            threadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+            startedAt: now,
+            completedAt: now,
+          },
+        ],
+      },
+    );
+
+    expect(exit._tag).toBe("Failure");
+    expect(String(exit.cause)).toContain("running");
   });
 });
