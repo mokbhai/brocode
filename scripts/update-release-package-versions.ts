@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 
 export const releasePackageFiles = [
   "apps/server/package.json",
-  "apps/desktop/package.json",
+  "apps/desktop-tauri/package.json",
   "apps/web/package.json",
   "packages/contracts/package.json",
 ] as const;
+
+export const releaseJsonVersionFiles = ["apps/desktop-tauri/src-tauri/tauri.conf.json"] as const;
 
 interface UpdateReleasePackageVersionsOptions {
   readonly rootDir?: string;
@@ -34,6 +36,18 @@ export function updateReleasePackageVersions(
 
     packageJson.version = version;
     writeFileSync(filePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+    changed = true;
+  }
+
+  for (const relativePath of releaseJsonVersionFiles) {
+    const filePath = resolve(rootDir, relativePath);
+    const json = JSON.parse(readFileSync(filePath, "utf8")) as MutablePackageJson;
+    if (json.version === version) {
+      continue;
+    }
+
+    json.version = version;
+    writeFileSync(filePath, `${JSON.stringify(json, null, 2)}\n`);
     changed = true;
   }
 

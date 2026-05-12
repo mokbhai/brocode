@@ -19,7 +19,7 @@ import { HiMiniArrowsPointingOut } from "react-icons/hi2";
 import { TbExchange, TbLayoutSidebarRight } from "react-icons/tb";
 import type { ThreadPrimarySurface } from "../../types";
 import GitActionsControl from "../GitActionsControl";
-import { AppsIcon, ArrowRightIcon, GlobeIcon, PlusIcon, TerminalIcon, XIcon } from "~/lib/icons";
+import { ArrowRightIcon, GlobeIcon, PlusIcon, TerminalIcon, XIcon } from "~/lib/icons";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
@@ -30,9 +30,6 @@ import { Toggle } from "../ui/toggle";
 import { useSidebar } from "../ui/sidebar";
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
-import { readNativeApi } from "~/nativeApi";
-import { resolveEditorIcon } from "../../editorMetadata";
-import { usePreferredEditor } from "../../editorPreferences";
 import { useIsDisposableThread } from "~/hooks/useIsDisposableThread";
 import { ClaudeAI, CursorIcon, Gemini, OpenAI, OpenCodeIcon } from "../Icons";
 import { gitStatusQueryOptions } from "~/lib/gitReactQuery";
@@ -157,8 +154,6 @@ export const ChatHeader = memo(function ChatHeader({
   const headerRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
   const [openAddActionNonce, setOpenAddActionNonce] = useState(0);
-  const [preferredEditor] = usePreferredEditor(availableEditors);
-  const EditorIcon = preferredEditor ? resolveEditorIcon(preferredEditor) : null;
   // Reuse the shared git status query so the diff toggle can show live totals
   // without introducing a second API shape just for the header control.
   const { data: gitStatus = null } = useQuery(gitStatusQueryOptions(gitCwd));
@@ -167,8 +162,7 @@ export const ChatHeader = memo(function ChatHeader({
   const isDisposableThread = useIsDisposableThread(activeThreadId);
 
   const isSplitPane = surfaceMode === "split";
-  const inlineChatLayoutAction = chatLayoutAction?.kind === "maximize" ? chatLayoutAction : null;
-  const menuChatLayoutAction = inlineChatLayoutAction ? null : chatLayoutAction;
+  const menuChatLayoutAction = chatLayoutAction;
   const threadIconKind = resolveChatHeaderThreadIconKind(activeThreadEntryPoint);
   const showSidechatTitleChip = isSidechat && compact;
 
@@ -365,122 +359,61 @@ export const ChatHeader = memo(function ChatHeader({
             keybindings={keybindings}
             availableEditors={availableEditors}
             openInCwd={openInCwd}
-          />
-        ) : null}
-
-        {!isDisposableThread && inlineChatLayoutAction ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="outline"
-                  className="shrink-0 bg-transparent not-disabled:before:shadow-none dark:not-disabled:before:shadow-none [:hover,[data-pressed]]:bg-[var(--sidebar-accent)] dark:[:hover,[data-pressed]]:bg-[var(--sidebar-accent)]"
-                  aria-label={inlineChatLayoutAction.label}
-                  onClick={inlineChatLayoutAction.onClick}
-                >
-                  <HiMiniArrowsPointingOut className="size-3.5" />
-                </Button>
-              }
-            />
-            <TooltipPopup side="bottom">{inlineChatLayoutAction.label}</TooltipPopup>
-          </Tooltip>
-        ) : null}
-
-        {/* Panel toggles menu — editor, terminal, browser, split chat. */}
-        {!isDisposableThread &&
-        (terminalAvailable ||
-          activeProjectName ||
-          menuChatLayoutAction ||
-          changeThreadAction ||
-          isElectron) ? (
-          <Menu modal={false}>
-            <MenuTrigger
-              render={
-                <Button
-                  size="icon-xs"
-                  variant="outline"
-                  className="shrink-0 bg-transparent not-disabled:before:shadow-none dark:not-disabled:before:shadow-none [:hover,[data-pressed]]:bg-[var(--sidebar-accent)] dark:[:hover,[data-pressed]]:bg-[var(--sidebar-accent)]"
-                  aria-label="Panel toggles"
-                />
-              }
-            >
-              <AppsIcon className="size-3.5" />
-            </MenuTrigger>
-            <MenuPopup
-              align="end"
-              side="bottom"
-              className="w-50 rounded-lg border-[color:var(--color-border)] bg-[var(--composer-surface)] shadow-lg"
-            >
-              {activeProjectName ? (
-                <MenuItem
-                  onClick={() => {
-                    const api = readNativeApi();
-                    if (api && openInCwd && preferredEditor) {
-                      void api.shell.openInEditor(openInCwd, preferredEditor);
-                    }
-                  }}
-                  disabled={!preferredEditor || !openInCwd}
-                >
-                  {EditorIcon ? (
-                    <EditorIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  ) : null}
-                  <span>Open in editor</span>
-                </MenuItem>
-              ) : null}
-              <MenuItem onClick={onToggleTerminal} disabled={!terminalAvailable}>
-                <BsTerminal className="size-3.5 shrink-0" />
-                <span>{terminalOpen ? "Hide terminal" : "Show terminal"}</span>
-                {terminalToggleShortcutLabel && (
-                  <span className="ml-auto text-[11px] opacity-60">
-                    {terminalToggleShortcutLabel}
-                  </span>
-                )}
-              </MenuItem>
-              {isElectron ? (
-                <MenuItem onClick={onToggleBrowser}>
-                  <GlobeIcon className="size-3.5 shrink-0" />
-                  <span>{browserOpen ? "Hide browser" : "Show browser"}</span>
-                  {browserToggleShortcutLabel && (
+            actionItems={
+              <>
+                <MenuItem onClick={onToggleTerminal} disabled={!terminalAvailable}>
+                  <BsTerminal className="size-3.5 shrink-0" />
+                  <span>{terminalOpen ? "Hide terminal" : "Show terminal"}</span>
+                  {terminalToggleShortcutLabel && (
                     <span className="ml-auto text-[11px] opacity-60">
-                      {browserToggleShortcutLabel}
+                      {terminalToggleShortcutLabel}
                     </span>
                   )}
                 </MenuItem>
-              ) : null}
-              {menuChatLayoutAction ? (
-                <MenuItem onClick={menuChatLayoutAction.onClick}>
-                  {menuChatLayoutAction.kind === "split" ? (
-                    <BsLayoutSplit className="size-3.5 shrink-0" />
-                  ) : (
-                    <HiMiniArrowsPointingOut className="size-3.5 shrink-0" />
-                  )}
-                  <span>{menuChatLayoutAction.label}</span>
-                  {menuChatLayoutAction.shortcutLabel && (
-                    <span className="ml-auto text-[11px] opacity-60">
-                      {menuChatLayoutAction.shortcutLabel}
-                    </span>
-                  )}
-                </MenuItem>
-              ) : null}
-              {changeThreadAction ? (
-                <MenuItem onClick={changeThreadAction.onClick}>
-                  <TbExchange className="size-3.5 shrink-0" />
-                  <span>{changeThreadAction.label}</span>
-                </MenuItem>
-              ) : null}
-              {activeProjectScripts ? (
-                <>
-                  <MenuSeparator className="mx-1" />
-                  <MenuItem onClick={() => setOpenAddActionNonce((current) => current + 1)}>
-                    <PlusIcon className="size-3.5 shrink-0" />
-                    <span>Add action</span>
+                {isElectron ? (
+                  <MenuItem onClick={onToggleBrowser}>
+                    <GlobeIcon className="size-3.5 shrink-0" />
+                    <span>{browserOpen ? "Hide browser" : "Show browser"}</span>
+                    {browserToggleShortcutLabel && (
+                      <span className="ml-auto text-[11px] opacity-60">
+                        {browserToggleShortcutLabel}
+                      </span>
+                    )}
                   </MenuItem>
-                </>
-              ) : null}
-            </MenuPopup>
-          </Menu>
+                ) : null}
+                {menuChatLayoutAction ? (
+                  <MenuItem onClick={menuChatLayoutAction.onClick}>
+                    {menuChatLayoutAction.kind === "split" ? (
+                      <BsLayoutSplit className="size-3.5 shrink-0" />
+                    ) : (
+                      <HiMiniArrowsPointingOut className="size-3.5 shrink-0" />
+                    )}
+                    <span>{menuChatLayoutAction.label}</span>
+                    {menuChatLayoutAction.shortcutLabel && (
+                      <span className="ml-auto text-[11px] opacity-60">
+                        {menuChatLayoutAction.shortcutLabel}
+                      </span>
+                    )}
+                  </MenuItem>
+                ) : null}
+                {changeThreadAction ? (
+                  <MenuItem onClick={changeThreadAction.onClick}>
+                    <TbExchange className="size-3.5 shrink-0" />
+                    <span>{changeThreadAction.label}</span>
+                  </MenuItem>
+                ) : null}
+                {activeProjectScripts ? (
+                  <>
+                    <MenuSeparator className="mx-1" />
+                    <MenuItem onClick={() => setOpenAddActionNonce((current) => current + 1)}>
+                      <PlusIcon className="size-3.5 shrink-0" />
+                      <span>Add action</span>
+                    </MenuItem>
+                  </>
+                ) : null}
+              </>
+            }
+          />
         ) : null}
 
         {!isDisposableThread && activeProjectName && showGitActions ? (

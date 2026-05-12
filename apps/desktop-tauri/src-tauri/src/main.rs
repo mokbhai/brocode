@@ -5,10 +5,10 @@ mod paths;
 use std::{env, path::PathBuf};
 
 use backend::{start_backend, stop_backend, BackendConfig, BackendState};
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
@@ -24,21 +24,24 @@ fn main() {
             bridge::notifications_show,
         ])
         .setup(|app| {
-            let repo_root = paths::repo_root_from_manifest_dir();
+            let repo_root = paths::runtime_root(app.path().resource_dir().ok());
+            let user_home_dir = app.path().home_dir().ok();
+            let app_data_dir = app.path().app_data_dir().ok();
             let home_dir = env::var_os("BROCODE_HOME")
                 .or_else(|| env::var_os("DPCODE_HOME"))
                 .map(PathBuf::from)
-                .unwrap_or_else(|| paths::default_dev_home(&repo_root));
-            let port = env::var("T3CODE_PORT")
+                .unwrap_or_else(|| paths::default_home(&repo_root, user_home_dir, app_data_dir));
+            let configured_port = env::var("T3CODE_PORT")
                 .ok()
-                .and_then(|value| value.parse::<u16>().ok())
-                .unwrap_or(58090);
+                .and_then(|value| value.parse::<u16>().ok());
+            let port = configured_port.unwrap_or(58090);
 
             let config = BackendConfig {
                 port,
                 host: "127.0.0.1".to_string(),
                 home_dir,
                 repo_root,
+                allow_port_fallback: configured_port.is_none(),
             };
             let state = BackendState::new();
 
@@ -54,11 +57,22 @@ fn main() {
         .on_window_event(|window, event| {
             if matches!(event, WindowEvent::CloseRequested { .. }) {
                 let state = window.state::<BackendState>().inner().clone();
-                if let Err(error) = tauri::async_runtime::block_on(stop_backend(state)) {
-                    eprintln!("failed to stop BroCode backend: {error}");
-                }
+                stop_backend_now(state);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("failed to run BroCode Tauri shell");
+        .build(tauri::generate_context!())
+        .expect("failed to build BroCode Tauri shell");
+
+    app.run(|app_handle, event| {
+        if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
+            let state = app_handle.state::<BackendState>().inner().clone();
+            stop_backend_now(state);
+        }
+    });
+}
+
+fn stop_backend_now(state: BackendState) {
+    if let Err(error) = tauri::async_runtime::block_on(stop_backend(state)) {
+        eprintln!("failed to stop BroCode backend: {error}");
+    }
 }

@@ -236,6 +236,7 @@ const BENIGN_ERROR_LOG_SNIPPETS = [
   "state db record_discrepancy: find_thread_path_by_id_str_in_subdir, falling_back",
 ];
 const BENIGN_PROCESS_OUTPUT_REGEXES = [/^(?:\^C)?Token usage:/i];
+const CODEX_STDOUT_LOG_PREVIEW_MAX = 500;
 const RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS = [
   "not found",
   "missing thread",
@@ -460,6 +461,13 @@ export function buildCodexProcessEnv(
 
 function normalizeCodexProcessLine(rawLine: string): string {
   return rawLine.replaceAll(ANSI_ESCAPE_REGEX, "").trim();
+}
+
+function previewCodexStdoutLine(line: string): string {
+  const normalized = line.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "?");
+  return normalized.length <= CODEX_STDOUT_LOG_PREVIEW_MAX
+    ? normalized
+    : `${normalized.slice(0, CODEX_STDOUT_LOG_PREVIEW_MAX)}...`;
 }
 
 function isIgnorableCodexProcessLine(rawLine: string): boolean {
@@ -2276,10 +2284,11 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     try {
       parsed = JSON.parse(line);
     } catch {
-      this.emitErrorEvent(
-        context,
-        "protocol/parseError",
-        "Received invalid JSON from codex app-server.",
+      void this.runPromise(
+        Effect.logWarning("codex app-server emitted non-json stdout line", {
+          threadId: context.session.threadId,
+          preview: previewCodexStdoutLine(line),
+        }),
       );
       return;
     }

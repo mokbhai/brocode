@@ -12,6 +12,7 @@ import {
 } from "./serverRuntimeState";
 import { resolveListeningPort } from "./startupAccess";
 import { ServerConfig } from "./config";
+import { startExternalBrowserRuntime, stopExternalBrowserRuntime } from "./externalBrowserRuntime";
 import { patchBunWebSocketCloseEventCompatibility } from "./bunWebSocketCompatibility";
 import { makeEffectHttpRouteLayer } from "./http";
 import { Keybindings } from "./keybindings";
@@ -113,6 +114,29 @@ export const createEffectServer = Effect.fn(function* () {
   );
   yield* Effect.addFinalizer(() => clearPersistedServerRuntimeState(config.serverRuntimeStatePath));
   yield* readiness.markHttpListening;
+
+  if (config.mode === "desktop") {
+    yield* Effect.tryPromise({
+      try: () =>
+        startExternalBrowserRuntime({
+          baseDir: config.baseDir,
+          env: process.env,
+          platform: process.platform,
+        }),
+      catch: (cause) => new ServerLifecycleError({ operation: "browserRuntimeStart", cause }),
+    }).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning("failed to start external browser runtime", { cause }),
+      ),
+    );
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(() => stopExternalBrowserRuntime()).pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning("failed to stop external browser runtime", { cause }),
+        ),
+      ),
+    );
+  }
 
   const subscriptionsScope = yield* Scope.make("sequential");
   yield* Effect.addFinalizer(() => Scope.close(subscriptionsScope, Exit.void));

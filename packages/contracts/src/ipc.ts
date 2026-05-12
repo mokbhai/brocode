@@ -282,6 +282,9 @@ export interface DesktopBridge {
     isSupported: () => Promise<boolean>;
     show: (input: DesktopNotificationInput) => Promise<boolean>;
   };
+  power: {
+    setPreventSleep: (enabled: boolean) => Promise<boolean>;
+  };
   server?: {
     transcribeVoice: (
       input: ServerVoiceTranscriptionInput,

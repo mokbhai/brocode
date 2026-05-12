@@ -43,7 +43,7 @@ import {
   markPromotedDraftThreads,
   useComposerDraftStore,
 } from "../composerDraftStore";
-import { useStore } from "../store";
+import { useStore, type AppState } from "../store";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { terminalActivityFromEvent } from "../terminalActivity";
 import {
@@ -67,11 +67,13 @@ import { useChatCodeFont } from "../hooks/useChatCodeFont";
 import { useTheme } from "../hooks/useTheme";
 import { useUIFont } from "../hooks/useUIFont";
 import { useNativeFontSmoothing } from "../hooks/useNativeFontSmoothing";
+import { useAppSettings } from "../appSettings";
 import { invalidateGitQueries } from "../lib/gitReactQuery";
 import { hasLiveThreadsWithMissingProjects } from "../lib/desktopProjectRecovery";
 import { parseDiffRouteSearch } from "../diffRouteSearch";
 import { resolveSplitViewThreadIds, selectSplitView, useSplitViewStore } from "../splitViewStore";
 import { providerDiscoveryQueryKeys } from "../lib/providerDiscoveryReactQuery";
+import { isRunningChatSession, shouldPreventSystemSleep } from "../sleepPrevention";
 
 const SHELL_SNAPSHOT_BOOTSTRAP_FALLBACK_DELAY_MS = 1_500;
 const THREAD_DETAIL_CATCHUP_INTERVAL_MS = 1_500;
@@ -136,11 +138,60 @@ function RootRouteView() {
         <GlobalShortcutsDialog />
         <GlobalWhatsNewSurface />
         <TaskCompletionNotifications />
+        <SystemSleepPrevention />
         <DesktopProjectBootstrap />
         <Outlet />
       </AnchoredToastProvider>
     </ToastProvider>
   );
+}
+
+function selectHasRunningChatSession(state: AppState): boolean {
+  const sessionById = state.threadSessionById ?? {};
+  for (const threadId in sessionById) {
+    if (isRunningChatSession(sessionById[threadId])) {
+      return true;
+    }
+  }
+
+  for (const thread of state.threads) {
+    if (isRunningChatSession(thread.session)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function SystemSleepPrevention() {
+  const { settings } = useAppSettings();
+  const hasRunningChat = useStore(selectHasRunningChatSession);
+  const preventSleep = shouldPreventSystemSleep({
+    enabled: settings.preventSystemSleepDuringActiveChats,
+    hasRunningChat,
+  });
+
+  useEffect(() => {
+    const setPreventSleep = window.desktopBridge?.power?.setPreventSleep;
+    if (typeof setPreventSleep !== "function") {
+      return;
+    }
+
+    void setPreventSleep(preventSleep).catch(() => {});
+  }, [preventSleep]);
+
+  useEffect(() => {
+    const setPreventSleep = window.desktopBridge?.power?.setPreventSleep;
+    if (typeof setPreventSleep !== "function") {
+      return;
+    }
+
+    return () => {
+      void setPreventSleep(false).catch(() => {});
+    };
+  }, []);
+
+  return null;
 }
 
 function GlobalShortcutsDialog() {

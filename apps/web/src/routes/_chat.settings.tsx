@@ -513,6 +513,10 @@ function SettingsRouteView() {
     ...(settings.enableCodexBrowserTool !== defaults.enableCodexBrowserTool
       ? ["Codex browser tool"]
       : []),
+    ...(settings.preventSystemSleepDuringActiveChats !==
+    defaults.preventSystemSleepDuringActiveChats
+      ? ["Sleep prevention"]
+      : []),
     ...(settings.diffWordWrap !== defaults.diffWordWrap ? ["Diff line wrapping"] : []),
     ...(settings.confirmThreadDelete !== defaults.confirmThreadDelete
       ? ["Delete confirmation"]
@@ -1534,6 +1538,36 @@ function SettingsRouteView() {
                   })
                 }
                 aria-label="Enable Codex browser tool"
+              />
+            }
+          />
+
+          <SettingsRow
+            title="Prevent sleep while chats run"
+            description="Keep the desktop app awake while any chat session is actively running."
+            resetAction={
+              settings.preventSystemSleepDuringActiveChats !==
+              defaults.preventSystemSleepDuringActiveChats ? (
+                <SettingResetButton
+                  label="sleep prevention"
+                  onClick={() =>
+                    updateSettings({
+                      preventSystemSleepDuringActiveChats:
+                        defaults.preventSystemSleepDuringActiveChats,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={settings.preventSystemSleepDuringActiveChats}
+                onCheckedChange={(checked) =>
+                  updateSettings({
+                    preventSystemSleepDuringActiveChats: Boolean(checked),
+                  })
+                }
+                aria-label="Prevent system sleep while chats run"
               />
             }
           />

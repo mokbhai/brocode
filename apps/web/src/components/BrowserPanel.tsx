@@ -295,6 +295,13 @@ function isBrowserPerfLoggingEnabled(): boolean {
   }
 }
 
+function usesExternalBrowserRuntime(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.__BROCODE_DESKTOP_RUNTIME === "tauri"
+  );
+}
+
 export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps) {
   const api = readNativeApi();
   const threadBrowserState = useStore(useBrowserStateStore, selectThreadBrowserState(threadId));
@@ -341,6 +348,7 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
   const [isAddressFocused, setIsAddressFocused] = useState(false);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const externalBrowserRuntime = usesExternalBrowserRuntime();
   const activeTab =
     threadBrowserState?.tabs.find((tab) => tab.id === threadBrowserState.activeTabId) ??
     threadBrowserState?.tabs[0] ??
@@ -464,7 +472,7 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
   }, [activeTab]);
 
   useLayoutEffect(() => {
-    if (!api || !workspaceReady || !activeTab) {
+    if (externalBrowserRuntime || !api || !workspaceReady || !activeTab) {
       return;
     }
 
@@ -533,7 +541,15 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
       webview.removeEventListener("dom-ready", attachVisibleWebview);
       webview.removeEventListener("did-start-loading", attachVisibleWebview);
     };
-  }, [activeTab, api, runBrowserAction, threadId, upsertThreadState, workspaceReady]);
+  }, [
+    activeTab,
+    api,
+    externalBrowserRuntime,
+    runBrowserAction,
+    threadId,
+    upsertThreadState,
+    workspaceReady,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -572,7 +588,7 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
   }, [threadId]);
 
   useLayoutEffect(() => {
-    if (!api) {
+    if (externalBrowserRuntime || !api) {
       return;
     }
 
@@ -718,7 +734,7 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
       burstFramesRemainingRef.current = 0;
       burstStableFramesRef.current = 0;
     };
-  }, [api, threadId]);
+  }, [api, externalBrowserRuntime, threadId]);
 
   const onSubmitAddress = useCallback(() => {
     if (!api || !activeTab) {
@@ -1159,7 +1175,44 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
               <DiffPanelLoadingState label="Starting browser..." />
             </div>
           ) : null}
-          <div ref={browserViewportRef} className="absolute inset-0 bg-transparent" />
+          {externalBrowserRuntime ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-background">
+              <div className="flex max-w-xl flex-col items-center gap-3 px-6 text-center">
+                <div className="flex size-12 items-center justify-center rounded-md border border-border bg-muted/30">
+                  <GlobeIcon className="size-5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {activeTab?.title || "External browser"}
+                  </div>
+                  <div className="max-w-xl truncate font-mono text-xs text-muted-foreground">
+                    {activeTab?.lastCommittedUrl ?? activeTab?.url ?? "about:blank"}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={!activeTab}
+                  onClick={() => {
+                    if (!api || !activeTab) return;
+                    void runBrowserAction(() =>
+                      api.browser.selectTab({ threadId, tabId: activeTab.id }),
+                    ).then((state) => {
+                      if (state) {
+                        upsertThreadState(state);
+                      }
+                    });
+                  }}
+                >
+                  <ExternalLinkIcon className="size-4" />
+                  <span>Focus window</span>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div ref={browserViewportRef} className="absolute inset-0 bg-transparent" />
+          )}
         </div>
       </div>
     </DiffPanelShell>

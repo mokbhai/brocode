@@ -21,7 +21,9 @@ export {
 } from "../lib/projectCreateRecovery";
 
 export const THREAD_SELECTION_SAFE_SELECTOR = "[data-thread-item], [data-thread-selection-safe]";
-export const SIDEBAR_THREAD_PREWARM_LIMIT = 10;
+// Full thread-detail hydration includes historical activity/tool payloads; keep
+// sidebar visibility from preloading that memory-heavy path by default.
+export const SIDEBAR_THREAD_PREWARM_LIMIT = 0;
 export const DEBUG_FEATURE_FLAGS_MENU_STORAGE_KEY = "brocode:show-debug-feature-flags-menu";
 export type SidebarNewThreadEnvMode = "local" | "worktree";
 type SidebarProject = {

@@ -1419,7 +1419,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
         () => {
           const title = document.querySelector<HTMLElement>(`h2[title='${longTitle}']`);
           const overflowButton = document.querySelector<HTMLButtonElement>(
-            'button[aria-label="Panel toggles"]',
+            'button[aria-label="Project actions"]',
           );
 
           expect(title, "Unable to find the chat header title.").toBeTruthy();
@@ -1623,9 +1623,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
     });
 
     try {
-      const panelTogglesButton = page.getByLabelText("Panel toggles");
-      await expect.element(panelTogglesButton).toBeInTheDocument();
-      await panelTogglesButton.click();
+      const projectActionsButton = page.getByLabelText("Project actions");
+      await expect.element(projectActionsButton).toBeInTheDocument();
+      await projectActionsButton.click();
       await expect.element(page.getByText("Open in editor")).toBeInTheDocument();
       await page.getByText("Open in editor").click();
 

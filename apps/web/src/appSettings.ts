@@ -106,6 +106,7 @@ export const AppSettingsSchema = Schema.Struct({
   diffWordWrap: Schema.Boolean.pipe(withDefaults(() => false)),
   enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => false)),
   enableCodexBrowserTool: Schema.Boolean.pipe(withDefaults(() => false)),
+  preventSystemSleepDuringActiveChats: Schema.Boolean.pipe(withDefaults(() => true)),
   enableNativeFontSmoothing: Schema.Boolean.pipe(withDefaults(getDefaultNativeFontSmoothing)),
   enableTaskCompletionToasts: Schema.Boolean.pipe(withDefaults(() => true)),
   enableSystemTaskCompletionNotifications: Schema.Boolean.pipe(withDefaults(() => true)),
@@ -250,6 +251,7 @@ function serverSettingsToAppSettings(settings: ServerSettings): Partial<AppSetti
     defaultThreadEnvMode: settings.defaultThreadEnvMode,
     enableAssistantStreaming: settings.enableAssistantStreaming,
     enableCodexBrowserTool: settings.enableCodexBrowserTool,
+    preventSystemSleepDuringActiveChats: settings.preventSystemSleepDuringActiveChats,
     geminiBinaryPath: settings.providers.gemini.binaryPath,
     openCodeBinaryPath: settings.providers.opencode.binaryPath,
     openCodeServerPassword: settings.providers.opencode.serverPassword,
@@ -280,6 +282,11 @@ function appSettingsPatchToServerSettingsPatch(patch: Partial<AppSettings>): Ser
   }
   if (hasOwn(patch, "enableCodexBrowserTool")) {
     serverPatch.enableCodexBrowserTool = Boolean(patch.enableCodexBrowserTool);
+  }
+  if (hasOwn(patch, "preventSystemSleepDuringActiveChats")) {
+    serverPatch.preventSystemSleepDuringActiveChats = Boolean(
+      patch.preventSystemSleepDuringActiveChats,
+    );
   }
   if (patch.defaultThreadEnvMode === "local" || patch.defaultThreadEnvMode === "worktree") {
     serverPatch.defaultThreadEnvMode = patch.defaultThreadEnvMode;
@@ -377,6 +384,7 @@ function buildInitialServerSettingsMigrationPatch(settings: AppSettings): Server
     "defaultThreadEnvMode",
     "enableAssistantStreaming",
     "enableCodexBrowserTool",
+    "preventSystemSleepDuringActiveChats",
     "geminiBinaryPath",
     "openCodeBinaryPath",
     "openCodeServerPassword",

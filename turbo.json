@@ -4,7 +4,6 @@
     "PORT",
     "VITE_WS_URL",
     "VITE_DEV_SERVER_URL",
-    "ELECTRON_RENDERER_PORT",
     "BROCODE_MODE",
     "BROCODE_PORT",
     "BROCODE_NO_BROWSER",
@@ -22,7 +21,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "dist-electron/**"]
+      "outputs": ["dist/**"]
     },
     "dev": {
       "dependsOn": ["@t3tools/contracts#build"],

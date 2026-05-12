@@ -935,7 +935,19 @@ describe("getSidebarThreadIdForJumpCommand", () => {
 });
 
 describe("getSidebarThreadIdsToPrewarm", () => {
-  it("returns the first visible sidebar rows up to the requested limit", () => {
+  it("does not prewarm visible sidebar rows by default", () => {
+    expect(
+      getSidebarThreadIdsToPrewarm({
+        visibleThreadIds: [
+          ThreadId.makeUnsafe("thread-1"),
+          ThreadId.makeUnsafe("thread-2"),
+          ThreadId.makeUnsafe("thread-3"),
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it("returns the first visible sidebar rows when explicitly given a limit", () => {
     expect(
       getSidebarThreadIdsToPrewarm({
         visibleThreadIds: [

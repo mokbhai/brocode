@@ -12,5 +12,6 @@ declare global {
   interface Window {
     nativeApi?: unknown;
     desktopBridge?: DesktopBridge;
+    __BROCODE_DESKTOP_RUNTIME?: "tauri";
   }
 }

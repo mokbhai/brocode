@@ -24,6 +24,9 @@ jobs:
         with:
           node-version-file: package.json
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Cache Bun and Turbo
         uses: actions/cache@v5
         with:
@@ -58,13 +61,11 @@ jobs:
       - name: Test
         run: bun run test
 
-      - name: Build desktop pipeline
-        run: bun run build:desktop
+      - name: Build Tauri desktop pipeline
+        run: bun run --cwd apps/desktop-tauri build -- --bundles appimage --no-sign
 
-      - name: Verify preload bundle output
-        run: |
-          test -f apps/desktop/dist-electron/preload.js
-          grep -nE "desktopBridge|getWsUrl|PICK_FOLDER_CHANNEL|wsUrl" apps/desktop/dist-electron/preload.js
+      - name: Verify bundled backend output
+        run: test -f apps/desktop-tauri/src-tauri/target/release/bundle/appimage/*.AppImage
 
   release_smoke:
     name: Release Smoke

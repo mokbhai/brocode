@@ -1,5 +1,6 @@
 use std::{
-    fmt,
+    env, fmt,
+    net::TcpListener,
     path::PathBuf,
     process::{ExitStatus, Stdio},
     sync::Arc,
@@ -19,6 +20,7 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
 const READINESS_INTERVAL: Duration = Duration::from_millis(200);
 const READINESS_REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 const SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(3);
+const PORT_FALLBACK_SCAN_LIMIT: u16 = 50;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendConfig {
@@ -26,6 +28,7 @@ pub struct BackendConfig {
     pub host: String,
     pub home_dir: PathBuf,
     pub repo_root: PathBuf,
+    pub allow_port_fallback: bool,
 }
 
 impl BackendConfig {
@@ -55,7 +58,7 @@ struct BackendInner {
 
 #[derive(Debug, Eq, PartialEq)]
 struct BackendCommandSpec {
-    executable: &'static str,
+    executable: PathBuf,
     current_dir: PathBuf,
     args: [&'static str; 1],
 }
@@ -75,6 +78,7 @@ pub enum BackendError {
     ChildExitedEarly { status: String },
     ChildMissingDuringStartup,
     Io(std::io::Error),
+    PortUnavailable { host: String, port: u16 },
     ReadinessTimeout { url: String },
 }
 
@@ -88,6 +92,9 @@ impl fmt::Display for BackendError {
                 write!(f, "backend process disappeared before readiness")
             }
             Self::Io(error) => write!(f, "{error}"),
+            Self::PortUnavailable { host, port } => {
+                write!(f, "backend port {host}:{port} is already in use")
+            }
             Self::ReadinessTimeout { url } => {
                 write!(f, "backend did not become ready at {url} within 30s")
             }
@@ -103,7 +110,12 @@ impl From<std::io::Error> for BackendError {
     }
 }
 
-pub async fn start_backend(state: BackendState, config: BackendConfig) -> Result<(), BackendError> {
+pub async fn start_backend(
+    state: BackendState,
+    mut config: BackendConfig,
+) -> Result<(), BackendError> {
+    config = resolve_available_backend_config(config)?;
+
     {
         let mut inner = state.inner.lock().await;
         if inner.child.is_some() {
@@ -111,6 +123,9 @@ pub async fn start_backend(state: BackendState, config: BackendConfig) -> Result
         }
 
         let home_dir = config.home_dir.to_string_lossy().to_string();
+        let browser_use_pipe_path = crate::paths::browser_use_pipe_path(&config.home_dir)
+            .to_string_lossy()
+            .to_string();
         let command_spec = backend_command_spec(&config);
         let mut command = Command::new(command_spec.executable);
         command
@@ -124,6 +139,9 @@ pub async fn start_backend(state: BackendState, config: BackendConfig) -> Result
             .env("T3CODE_HOME", &home_dir)
             .env("BROCODE_HOME", &home_dir)
             .env("DPCODE_HOME", &home_dir)
+            .env("BROCODE_BROWSER_USE_PIPE_PATH", &browser_use_pipe_path)
+            .env("DPCODE_BROWSER_USE_PIPE_PATH", &browser_use_pipe_path)
+            .env("T3CODE_BROWSER_USE_PIPE_PATH", &browser_use_pipe_path)
             .env("T3CODE_NO_BROWSER", "1")
             .env("BROCODE_NO_BROWSER", "1")
             .env_remove("T3CODE_AUTH_TOKEN")
@@ -162,6 +180,39 @@ pub async fn start_backend(state: BackendState, config: BackendConfig) -> Result
     Ok(())
 }
 
+pub fn resolve_available_backend_config(
+    config: BackendConfig,
+) -> Result<BackendConfig, BackendError> {
+    if port_is_available(&config.host, config.port) {
+        return Ok(config);
+    }
+
+    if !config.allow_port_fallback {
+        return Err(BackendError::PortUnavailable {
+            host: config.host,
+            port: config.port,
+        });
+    }
+
+    for offset in 1..=PORT_FALLBACK_SCAN_LIMIT {
+        let Some(port) = config.port.checked_add(offset) else {
+            break;
+        };
+        if port_is_available(&config.host, port) {
+            return Ok(BackendConfig { port, ..config });
+        }
+    }
+
+    Err(BackendError::PortUnavailable {
+        host: config.host,
+        port: config.port,
+    })
+}
+
+fn port_is_available(host: &str, port: u16) -> bool {
+    TcpListener::bind((host, port)).is_ok()
+}
+
 pub async fn stop_backend(state: BackendState) -> Result<(), BackendError> {
     let child = {
         let mut inner = state.inner.lock().await;
@@ -178,10 +229,31 @@ pub async fn stop_backend(state: BackendState) -> Result<(), BackendError> {
 
 fn backend_command_spec(config: &BackendConfig) -> BackendCommandSpec {
     BackendCommandSpec {
-        executable: "node",
+        executable: resolve_node_executable(),
         current_dir: config.repo_root.clone(),
         args: ["apps/server/dist/index.mjs"],
     }
+}
+
+fn resolve_node_executable() -> PathBuf {
+    if let Some(path) = env::var_os("NODE_BINARY").map(PathBuf::from) {
+        if path.is_file() {
+            return path;
+        }
+    }
+
+    for candidate in [
+        "/opt/homebrew/bin/node",
+        "/usr/local/bin/node",
+        "/usr/bin/node",
+    ] {
+        let path = PathBuf::from(candidate);
+        if path.is_file() {
+            return path;
+        }
+    }
+
+    PathBuf::from("node")
 }
 
 #[cfg(unix)]
@@ -346,6 +418,7 @@ mod tests {
             host: "127.0.0.1".to_string(),
             home_dir: PathBuf::from(".brocode-tauri-dev"),
             repo_root: PathBuf::from("."),
+            allow_port_fallback: false,
         };
 
         assert_eq!(config.http_url(), "http://127.0.0.1:58090");
@@ -368,13 +441,78 @@ mod tests {
             host: "127.0.0.1".to_string(),
             home_dir: PathBuf::from("/tmp/brocode-home"),
             repo_root: PathBuf::from("/tmp/brocode"),
+            allow_port_fallback: false,
         };
 
         let command = backend_command_spec(&config);
 
-        assert_eq!(command.executable, "node");
+        assert!(command.executable.ends_with("node"));
         assert_eq!(command.current_dir, PathBuf::from("/tmp/brocode"));
         assert_eq!(command.args, ["apps/server/dist/index.mjs"]);
+    }
+
+    #[test]
+    fn node_executable_falls_back_to_node_command() {
+        let path = resolve_node_executable();
+
+        assert!(path.ends_with("node"));
+    }
+
+    #[test]
+    fn backend_config_keeps_requested_port_when_available() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+
+        let config = BackendConfig {
+            port,
+            host: "127.0.0.1".to_string(),
+            home_dir: PathBuf::from("/tmp/brocode-home"),
+            repo_root: PathBuf::from("/tmp/brocode"),
+            allow_port_fallback: true,
+        };
+
+        assert_eq!(
+            resolve_available_backend_config(config.clone()).unwrap(),
+            config
+        );
+    }
+
+    #[test]
+    fn backend_config_falls_back_when_default_port_is_occupied() {
+        let first_listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let first_port = first_listener.local_addr().unwrap().port();
+
+        let config = BackendConfig {
+            port: first_port,
+            host: "127.0.0.1".to_string(),
+            home_dir: PathBuf::from("/tmp/brocode-home"),
+            repo_root: PathBuf::from("/tmp/brocode"),
+            allow_port_fallback: true,
+        };
+
+        let resolved = resolve_available_backend_config(config).unwrap();
+
+        assert_ne!(resolved.port, first_port);
+        assert_eq!(resolved.host, "127.0.0.1");
+    }
+
+    #[test]
+    fn backend_config_keeps_explicit_port_strict() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let config = BackendConfig {
+            port,
+            host: "127.0.0.1".to_string(),
+            home_dir: PathBuf::from("/tmp/brocode-home"),
+            repo_root: PathBuf::from("/tmp/brocode"),
+            allow_port_fallback: false,
+        };
+
+        let error = resolve_available_backend_config(config).unwrap_err();
+
+        assert!(matches!(error, BackendError::PortUnavailable { .. }));
     }
 
     #[test]

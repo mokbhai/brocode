@@ -23,6 +23,7 @@ import type { SessionCredentialServiceShape } from "./auth/Services/SessionCrede
 import { SessionCredentialService } from "./auth/Services/SessionCredentialService";
 import { deriveAuthClientMetadata } from "./auth/utils";
 import { ServerConfig, type ServerConfigShape } from "./config";
+import { handleExternalBrowserAction } from "./externalBrowserRuntime";
 import { LOCAL_IMAGE_ROUTE_PATH, resolveAllowedLocalImageFile } from "./localImageFiles.ts";
 import type { ProjectFaviconResolverShape } from "./project/Services/ProjectFaviconResolver";
 import { ProjectFaviconResolver } from "./project/Services/ProjectFaviconResolver";
@@ -60,6 +61,7 @@ export function makeEffectHttpRouteLayer(readiness: ServerReadiness) {
     authEffectRouteLayer,
     projectFaviconEffectRouteLayer,
     localImageEffectRouteLayer,
+    browserEffectRouteLayer,
     attachmentsEffectRouteLayer,
     staticAndDevEffectRouteLayer,
   );
@@ -70,6 +72,50 @@ const requireAuthenticatedRequest = Effect.gen(function* () {
   const serverAuth = yield* ServerAuth;
   yield* serverAuth.authenticateHttpRequest(makeEffectAuthRequest(request));
 });
+
+const browserEffectRouteLayer = HttpRouter.add(
+  "*",
+  "/api/browser/*",
+  Effect.gen(function* () {
+    const config = yield* ServerConfig;
+    if (config.authToken) {
+      yield* requireAuthenticatedRequest;
+    }
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = HttpServerRequest.toURL(request);
+    if (!url) return HttpServerResponse.text("Bad Request", { status: 400 });
+    const action = url.pathname.slice("/api/browser/".length);
+    if (!action) return HttpServerResponse.text("Not Found", { status: 404 });
+    const input =
+      request.method === "GET" || Number(request.headers["content-length"] ?? "0") === 0
+        ? {}
+        : yield* readEffectJson(request, "Invalid browser payload.");
+    const result = yield* Effect.tryPromise({
+      try: () => handleExternalBrowserAction(action, input),
+      catch: (cause) => cause,
+    });
+    return HttpServerResponse.jsonUnsafe(result);
+  }).pipe(
+    Effect.catch((error) =>
+      Effect.succeed(
+        HttpServerResponse.jsonUnsafe(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : String((error as { message?: unknown }).message ?? error),
+          },
+          {
+            status:
+              typeof (error as { status?: unknown }).status === "number"
+                ? (error as { status: number }).status
+                : 500,
+          },
+        ),
+      ),
+    ),
+  ),
+);
 
 export function isLegacyTokenAuthorized(input: {
   readonly config: ServerConfigShape;

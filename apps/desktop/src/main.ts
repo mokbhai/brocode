@@ -18,6 +18,7 @@ import {
   Notification,
   nativeImage,
   nativeTheme,
+  powerSaveBlocker,
   protocol,
   session,
   shell,
@@ -108,6 +109,7 @@ const UPDATE_DOWNLOAD_CHANNEL = "desktop:update-download";
 const UPDATE_INSTALL_CHANNEL = "desktop:update-install";
 const NOTIFICATIONS_IS_SUPPORTED_CHANNEL = "desktop:notifications-is-supported";
 const NOTIFICATIONS_SHOW_CHANNEL = "desktop:notifications-show";
+const POWER_SET_PREVENT_SLEEP_CHANNEL = "desktop:power-set-prevent-sleep";
 const BASE_DIR =
   process.env.BROCODE_HOME?.trim() ||
   process.env.DPCODE_HOME?.trim() ||
@@ -159,6 +161,7 @@ let backendLogSink: RotatingFileSink | null = null;
 let restoreStdIoCapture: (() => void) | null = null;
 let unreadBackgroundNotificationCount = 0;
 let browserPerfInterval: ReturnType<typeof setInterval> | null = null;
+let preventSleepBlockerId: number | null = null;
 const browserManager = new DesktopBrowserManager();
 let browserUsePipeServer: BrowserUsePipeServer | null = null;
 let configuredGitHubUpdateSource: ReturnType<typeof resolveGitHubUpdateSource> = null;
@@ -1832,6 +1835,25 @@ function registerIpcHandlers(): void {
         ...(typeof input?.threadId === "string" ? { threadId: input.threadId } : {}),
       }),
   );
+
+  ipcMain.removeHandler(POWER_SET_PREVENT_SLEEP_CHANNEL);
+  ipcMain.handle(POWER_SET_PREVENT_SLEEP_CHANNEL, async (_event, enabled: unknown) => {
+    if (enabled === true) {
+      if (preventSleepBlockerId !== null && powerSaveBlocker.isStarted(preventSleepBlockerId)) {
+        return true;
+      }
+      preventSleepBlockerId = powerSaveBlocker.start("prevent-app-suspension");
+      return powerSaveBlocker.isStarted(preventSleepBlockerId);
+    }
+
+    if (preventSleepBlockerId !== null) {
+      if (powerSaveBlocker.isStarted(preventSleepBlockerId)) {
+        powerSaveBlocker.stop(preventSleepBlockerId);
+      }
+      preventSleepBlockerId = null;
+    }
+    return false;
+  });
   registerDesktopVoiceTranscriptionHandler();
   startBrowserPerformanceLogging();
   void ensureBrowserUsePipeServer().catch((error) => {

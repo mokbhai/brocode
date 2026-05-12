@@ -30,7 +30,6 @@ export const MODE_ARGS = {
   ],
   "dev:server": ["run", "dev", "--filter=t3"],
   "dev:web": ["run", "dev", "--filter=@t3tools/web"],
-  "dev:desktop": ["run", "dev", "--filter=@t3tools/desktop", "--filter=@t3tools/web", "--parallel"],
   "dev:desktop-tauri": ["run", "dev", "--filter=@t3tools/desktop-tauri"],
 } as const satisfies Record<string, ReadonlyArray<string>>;
 
@@ -162,11 +161,7 @@ export function createDevRunnerEnv({
       T3CODE_HOME: resolvedBaseDir,
     };
 
-    if (mode === "dev:desktop") {
-      output.ELECTRON_RENDERER_PORT = String(webPort);
-    } else {
-      delete output.ELECTRON_RENDERER_PORT;
-    }
+    delete output.ELECTRON_RENDERER_PORT;
 
     if (host !== undefined) {
       output.T3CODE_HOST = host;

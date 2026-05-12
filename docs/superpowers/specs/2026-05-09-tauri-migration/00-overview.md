@@ -101,4 +101,4 @@ The third risk is packaging complexity. The current release process is Electron-
 
 ## Current Status
 
-Status: Phase 1 proof of concept complete; Phase 2 is next.
+Status: Tauri is the supported desktop shell, the backend-managed external Chromium browser runtime is implemented, and macOS unsigned install/startup has been smoke tested. Remaining validation is release hardening: native signing/notarization, updater behavior, full native menu parity, and Windows/Linux install and runtime smoke tests.

@@ -487,6 +487,7 @@ describe("AppSettingsSchema", () => {
       confirmTerminalTabClose: true,
       enableCodexBrowserTool: false,
       enableAssistantStreaming: false,
+      preventSystemSleepDuringActiveChats: true,
       sidebarProjectSortOrder: DEFAULT_SIDEBAR_PROJECT_SORT_ORDER,
       sidebarThreadSortOrder: DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
       timestampFormat: DEFAULT_TIMESTAMP_FORMAT,

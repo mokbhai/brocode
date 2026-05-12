@@ -23,10 +23,13 @@ export default defineConfig({
   plugins: [
     {
       name: "brocode-tauri-entry",
-      transformIndexHtml(html) {
-        if (!useTauriEntry) return html;
+      transformIndexHtml: {
+        order: "pre",
+        handler(html) {
+          if (!useTauriEntry) return html;
 
-        return html.replace(`src="/src/main.tsx"`, `src="/@fs/${desktopTauriEntry}"`);
+          return html.replace(`src="/src/main.tsx"`, `src="/@fs/${desktopTauriEntry}"`);
+        },
       },
     },
     tanstackRouter(),

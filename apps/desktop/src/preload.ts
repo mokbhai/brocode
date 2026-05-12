@@ -24,6 +24,7 @@ const UPDATE_DOWNLOAD_CHANNEL = "desktop:update-download";
 const UPDATE_INSTALL_CHANNEL = "desktop:update-install";
 const NOTIFICATIONS_IS_SUPPORTED_CHANNEL = "desktop:notifications-is-supported";
 const NOTIFICATIONS_SHOW_CHANNEL = "desktop:notifications-show";
+const POWER_SET_PREVENT_SLEEP_CHANNEL = "desktop:power-set-prevent-sleep";
 
 function getDesktopWsUrl(): string | null {
   try {
@@ -76,6 +77,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   notifications: {
     isSupported: () => ipcRenderer.invoke(NOTIFICATIONS_IS_SUPPORTED_CHANNEL),
     show: (input) => ipcRenderer.invoke(NOTIFICATIONS_SHOW_CHANNEL, input),
+  },
+  power: {
+    setPreventSleep: (enabled) => ipcRenderer.invoke(POWER_SET_PREVENT_SLEEP_CHANNEL, enabled),
   },
   server: {
     transcribeVoice: (input) => ipcRenderer.invoke(SERVER_TRANSCRIBE_VOICE_CHANNEL, input),

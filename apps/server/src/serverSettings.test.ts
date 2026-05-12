@@ -27,6 +27,7 @@ describe("ServerSettingsService", () => {
 
     expect(settings.providers.codex.binaryPath).toBe("codex");
     expect(settings.defaultThreadEnvMode).toBe("local");
+    expect(settings.preventSystemSleepDuringActiveChats).toBe(true);
   });
 
   it("persists updates and reloads them", async () => {
@@ -39,6 +40,7 @@ describe("ServerSettingsService", () => {
 
         const updated = yield* service.updateSettings({
           enableAssistantStreaming: true,
+          preventSystemSleepDuringActiveChats: false,
           providers: {
             codex: {
               binaryPath: "/usr/local/bin/codex",
@@ -52,9 +54,11 @@ describe("ServerSettingsService", () => {
     );
 
     expect(result.updated.enableAssistantStreaming).toBe(true);
+    expect(result.updated.preventSystemSleepDuringActiveChats).toBe(false);
     expect(result.updated.providers.codex.binaryPath).toBe("/usr/local/bin/codex");
     expect(result.parsed).toMatchObject({
       enableAssistantStreaming: true,
+      preventSystemSleepDuringActiveChats: false,
       providers: {
         codex: {
           binaryPath: "/usr/local/bin/codex",

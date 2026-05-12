@@ -403,6 +403,10 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
   });
 
   describe("MODE_ARGS", () => {
+    it("does not expose the legacy Electron desktop mode", () => {
+      assert.equal("dev:desktop" in MODE_ARGS, false);
+    });
+
     it("runs only the Tauri desktop package for Tauri dev mode", () => {
       assert.deepStrictEqual(MODE_ARGS["dev:desktop-tauri"], [
         "run",

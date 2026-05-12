@@ -4,3 +4,7 @@
 // Exports: module declarations only
 
 declare module "@fontsource-variable/jetbrains-mono";
+
+interface Window {
+  __BROCODE_DESKTOP_RUNTIME?: "tauri";
+}

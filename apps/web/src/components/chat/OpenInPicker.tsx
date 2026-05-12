@@ -4,24 +4,26 @@
 // Depends on: shared editor metadata, native shell bridge, and preferred editor state.
 
 import { type EditorId, type ResolvedKeybindingsConfig } from "@t3tools/contracts";
-import { memo, useCallback, useEffect, useMemo } from "react";
+import { memo, type ReactNode, useCallback, useEffect, useMemo } from "react";
 import { isOpenFavoriteEditorShortcut, shortcutLabelForCommand } from "../../keybindings";
 import { usePreferredEditor } from "../../editorPreferences";
 import { resolveAvailableEditorOptions } from "../../editorMetadata";
 import { ChevronDownIcon } from "~/lib/icons";
 import { Button } from "../ui/button";
 import { Group, GroupSeparator } from "../ui/group";
-import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "../ui/menu";
 import { readNativeApi } from "~/nativeApi";
 
 export const OpenInPicker = memo(function OpenInPicker({
   keybindings,
   availableEditors,
   openInCwd,
+  actionItems = null,
 }: {
   keybindings: ResolvedKeybindingsConfig;
   availableEditors: ReadonlyArray<EditorId>;
   openInCwd: string | null;
+  actionItems?: ReactNode;
 }) {
   const [preferredEditor, setPreferredEditor] = usePreferredEditor(availableEditors);
   const options = useMemo(
@@ -78,21 +80,32 @@ export const OpenInPicker = memo(function OpenInPicker({
       <GroupSeparator className="hidden @sm/header-actions:block" />
       <Menu>
         <MenuTrigger
-          render={<Button aria-label="Choose editor" size="icon-xs" variant="outline" />}
+          render={<Button aria-label="Project actions" size="icon-xs" variant="outline" />}
         >
           <ChevronDownIcon aria-hidden="true" className="size-4" />
         </MenuTrigger>
-        <MenuPopup align="end">
-          {options.length === 0 && <MenuItem disabled>No installed editors found</MenuItem>}
-          {options.map(({ label, Icon, value }) => (
-            <MenuItem key={value} onClick={() => openInEditor(value)}>
-              <Icon aria-hidden="true" className="text-muted-foreground" />
-              {label}
-              {value === preferredEditor && openFavoriteEditorShortcutLabel && (
-                <MenuShortcut>{openFavoriteEditorShortcutLabel}</MenuShortcut>
-              )}
-            </MenuItem>
-          ))}
+        <MenuPopup
+          align="end"
+          className="w-50 rounded-lg border-[color:var(--color-border)] bg-[var(--composer-surface)] shadow-lg"
+        >
+          <MenuItem
+            onClick={() => openInEditor(preferredEditor)}
+            disabled={!preferredEditor || !openInCwd}
+          >
+            {primaryOption?.Icon ? (
+              <primaryOption.Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+            ) : null}
+            <span>Open in editor</span>
+            {openFavoriteEditorShortcutLabel && (
+              <MenuShortcut>{openFavoriteEditorShortcutLabel}</MenuShortcut>
+            )}
+          </MenuItem>
+          {actionItems ? (
+            <>
+              <MenuSeparator className="mx-1" />
+              {actionItems}
+            </>
+          ) : null}
         </MenuPopup>
       </Menu>
     </Group>

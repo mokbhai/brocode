@@ -8,12 +8,14 @@ BROCODE_PORT_OFFSET ?= 3158
 BROCODE_RELEASE_DIR ?= release
 BROCODE_APP_DIR ?= /Applications
 BROCODE_BIN_DIR ?= $(HOME)/.local/bin
+BROCODE_TAURI_TARGET ?=
+BROCODE_TAURI_BUILD_ARGS ?=
 UNAME_M := $(shell uname -m 2>/dev/null || printf unknown)
 BROCODE_DESKTOP_ARCH ?= $(shell if [ "$(UNAME_M)" = arm64 ] || [ "$(UNAME_M)" = aarch64 ]; then printf arm64; elif [ "$(UNAME_M)" = x86_64 ] || [ "$(UNAME_M)" = amd64 ]; then printf x64; else printf '%s' "$(UNAME_M)"; fi)
 BROCODE_BUILD_ARGS ?=
 BROCODE_WINDOWS_INSTALLER_ARGS ?=
 
-.PHONY: help deps install install-macos install-linux install-windows desktop start start-desktop start-desktop-tauri desktop-dry-run start-desktop-electron clean
+.PHONY: help deps install install-macos install-linux install-windows desktop start start-desktop start-desktop-tauri desktop-dry-run clean
 
 help:
 	@printf '%s\n' 'BroCode desktop targets:'
@@ -24,7 +26,6 @@ help:
 	@printf '%s\n' '  make install-windows         Build and run the Windows installer'
 	@printf '%s\n' '  make start                   Dry-run, then start the Tauri desktop app'
 	@printf '%s\n' '  make desktop-dry-run         Show resolved desktop ports/env without starting'
-	@printf '%s\n' '  make start-desktop-electron  Start the legacy Electron desktop app'
 	@printf '%s\n' ''
 	@printf '%s\n' 'Overrides:'
 	@printf '%s\n' '  BROCODE_HOME=... BROCODE_PORT=... BROCODE_PORT_OFFSET=...'
@@ -43,10 +44,12 @@ install:
 	esac
 
 install-macos:
-	bun run dist:desktop:artifact -- --platform mac --target dmg --arch $(BROCODE_DESKTOP_ARCH) --output-dir $(BROCODE_RELEASE_DIR) $(BROCODE_BUILD_ARGS)
-	@dmg=$$(ls -t "$(BROCODE_RELEASE_DIR)"/BroCode-*-"$(BROCODE_DESKTOP_ARCH)".dmg 2>/dev/null | head -n 1); \
+	bun run --cwd apps/desktop-tauri build -- --bundles dmg $(BROCODE_TAURI_TARGET) $(BROCODE_TAURI_BUILD_ARGS)
+	@mkdir -p "$(BROCODE_RELEASE_DIR)"; \
+	cp -f apps/desktop-tauri/src-tauri/target/release/bundle/dmg/*.dmg "$(BROCODE_RELEASE_DIR)/"; \
+	dmg=$$(ls -t apps/desktop-tauri/src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null | head -n 1); \
 	if [ -z "$$dmg" ]; then \
-		printf '%s\n' "Could not find a macOS DMG in $(BROCODE_RELEASE_DIR) for arch $(BROCODE_DESKTOP_ARCH)."; \
+		printf '%s\n' "Could not find a Tauri macOS DMG."; \
 		exit 1; \
 	fi; \
 	mount_dir=$$(mktemp -d "$${TMPDIR:-/tmp}/brocode-dmg.XXXXXX"); \
@@ -68,10 +71,12 @@ install-macos:
 	printf '%s\n' "Installed $$dest"
 
 install-linux:
-	bun run dist:desktop:artifact -- --platform linux --target AppImage --arch $(BROCODE_DESKTOP_ARCH) --output-dir $(BROCODE_RELEASE_DIR) $(BROCODE_BUILD_ARGS)
-	@artifact=$$(ls -t "$(BROCODE_RELEASE_DIR)"/BroCode-*-"$(BROCODE_DESKTOP_ARCH)".AppImage 2>/dev/null | head -n 1); \
+	bun run --cwd apps/desktop-tauri build -- --bundles appimage $(BROCODE_TAURI_TARGET) $(BROCODE_TAURI_BUILD_ARGS)
+	@mkdir -p "$(BROCODE_RELEASE_DIR)"; \
+	cp -f apps/desktop-tauri/src-tauri/target/release/bundle/appimage/*.AppImage "$(BROCODE_RELEASE_DIR)/"; \
+	artifact=$$(ls -t apps/desktop-tauri/src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -n 1); \
 	if [ -z "$$artifact" ]; then \
-		printf '%s\n' "Could not find a Linux AppImage in $(BROCODE_RELEASE_DIR) for arch $(BROCODE_DESKTOP_ARCH)."; \
+		printf '%s\n' "Could not find a Tauri Linux AppImage."; \
 		exit 1; \
 	fi; \
 	mkdir -p "$(BROCODE_BIN_DIR)"; \
@@ -84,10 +89,12 @@ install-linux:
 	printf '%s\n' "Make sure $(BROCODE_BIN_DIR) is on PATH."
 
 install-windows:
-	bun run dist:desktop:artifact -- --platform win --target nsis --arch $(BROCODE_DESKTOP_ARCH) --output-dir $(BROCODE_RELEASE_DIR) $(BROCODE_BUILD_ARGS)
-	@installer=$$(ls -t "$(BROCODE_RELEASE_DIR)"/BroCode-*-"$(BROCODE_DESKTOP_ARCH)".exe 2>/dev/null | head -n 1); \
+	bun run --cwd apps/desktop-tauri build -- --bundles nsis $(BROCODE_TAURI_TARGET) $(BROCODE_TAURI_BUILD_ARGS)
+	@mkdir -p "$(BROCODE_RELEASE_DIR)"; \
+	cp -f apps/desktop-tauri/src-tauri/target/release/bundle/nsis/*.exe "$(BROCODE_RELEASE_DIR)/"; \
+	installer=$$(ls -t apps/desktop-tauri/src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | head -n 1); \
 	if [ -z "$$installer" ]; then \
-		printf '%s\n' "Could not find a Windows installer in $(BROCODE_RELEASE_DIR) for arch $(BROCODE_DESKTOP_ARCH)."; \
+		printf '%s\n' "Could not find a Tauri Windows installer."; \
 		exit 1; \
 	fi; \
 	case "$$(uname -s 2>/dev/null || printf unknown)" in \
@@ -114,9 +121,6 @@ start-desktop-tauri: start-desktop
 
 desktop-dry-run:
 	env -u T3CODE_AUTH_TOKEN T3CODE_PORT_OFFSET=$(BROCODE_PORT_OFFSET) bun run dev:desktop-tauri -- --home-dir $(BROCODE_HOME) --port $(BROCODE_PORT) --dry-run
-
-start-desktop-electron:
-	bun run electron:dev
 
 clean:
 	bun run clean

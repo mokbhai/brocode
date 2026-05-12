@@ -1,4 +1,4 @@
 import { installDesktopBridge } from "./desktopBridge";
 
-installDesktopBridge();
+await installDesktopBridge();
 await import("brocode-web-entry");

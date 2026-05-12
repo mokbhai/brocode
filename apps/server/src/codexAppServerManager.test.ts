@@ -433,6 +433,18 @@ describe("handleStdoutLine", () => {
 
     expect(emitEvent).not.toHaveBeenCalled();
   });
+
+  it("does not surface malformed stdout as a runtime error", () => {
+    const { manager, context, emitEvent } = createProcessOutputHarness();
+
+    (
+      manager as unknown as {
+        handleStdoutLine: (context: unknown, line: string) => void;
+      }
+    ).handleStdoutLine(context, '<div data-framer-name="hero-text" style="transform:translateX(0)">');
+
+    expect(emitEvent).not.toHaveBeenCalled();
+  });
 });
 
 describe("normalizeCodexModelSlug", () => {
