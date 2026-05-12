@@ -165,7 +165,7 @@ describe("decideKanbanCommand", () => {
     ]);
   });
 
-  it("rejects card creation when specPath is absent even though the contract allows it", async () => {
+  it("creates a card without specPath when a thread or inline spec is the source", async () => {
     const command = {
       type: "kanban.card.create",
       commandId: CommandId.makeUnsafe("cmd_card_create_without_spec"),
@@ -185,10 +185,16 @@ describe("decideKanbanCommand", () => {
       createdAt: now,
     } as KanbanCommand;
 
-    const exit = await runDecisionExit(command, readModelWithBoard());
+    const events = asEvents(await runDecision(command, readModelWithBoard()));
+    const event = events[0]!;
 
-    expect(exit._tag).toBe("Failure");
-    expect(String(exit.cause)).toContain("specPath");
+    expect(events).toHaveLength(1);
+    expect(event.type).toBe("kanban.card.created");
+    expect(event.payload.card).toMatchObject({
+      id: cardId,
+      title: "Build Kanban orchestration",
+    });
+    expect(event.payload.card.specPath).toBeUndefined();
   });
 
   it("requires an existing board and absent card for card creation", async () => {
@@ -224,6 +230,38 @@ describe("decideKanbanCommand", () => {
     expect(String(duplicateCard.cause)).toContain("already exists");
   });
 
+  it("updates card metadata and can clear optional description and specPath", async () => {
+    const events = asEvents(
+      await runDecision(
+        {
+          type: "kanban.card.update",
+          commandId: CommandId.makeUnsafe("cmd_card_update"),
+          cardId,
+          title: "Updated Kanban orchestration",
+          description: null,
+          specPath: null,
+          runtimeMode: "approval-required",
+          updatedAt: now,
+        },
+        {
+          ...readModelWithBoard(),
+          cards: [readyCard()],
+        },
+      ),
+    );
+    const event = events[0]!;
+
+    expect(events).toHaveLength(1);
+    expect(event.type).toBe("kanban.card.updated");
+    expect(event.payload.card).toMatchObject({
+      id: cardId,
+      title: "Updated Kanban orchestration",
+      runtimeMode: "approval-required",
+    });
+    expect(event.payload.card.description).toBeUndefined();
+    expect(event.payload.card.specPath).toBeUndefined();
+  });
+
   it("requires an existing card for task upsert", async () => {
     const exit = await runDecisionExit(
       {
@@ -243,6 +281,38 @@ describe("decideKanbanCommand", () => {
 
     expect(exit._tag).toBe("Failure");
     expect(String(exit.cause)).toContain("Card");
+  });
+
+  it("requires a task to exist on the requested card before deleting it", async () => {
+    const existingTaskId = KanbanTaskId.makeUnsafe("task_existing");
+    const missingTaskId = KanbanTaskId.makeUnsafe("task_missing");
+    const exit = await runDecisionExit(
+      {
+        type: "kanban.task.delete",
+        commandId: CommandId.makeUnsafe("cmd_task_delete_missing"),
+        cardId,
+        taskId: missingTaskId,
+        deletedAt: now,
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard()],
+        tasks: [
+          {
+            id: existingTaskId,
+            cardId,
+            title: "Existing task",
+            status: "todo",
+            order: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      },
+    );
+
+    expect(exit._tag).toBe("Failure");
+    expect(String(exit.cause)).toContain("does not exist on card");
   });
 
   it("rejects invalid lifecycle transitions such as submitted to implementing", async () => {

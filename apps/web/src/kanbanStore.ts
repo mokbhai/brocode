@@ -50,7 +50,7 @@ export interface CreateKanbanCardInput {
   sourceThreadId?: ThreadId | null;
   title: string;
   description?: string;
-  specPath: string;
+  specPath?: string;
   tasks?: readonly CreateKanbanCardTaskInput[];
   modelSelection: ModelSelection;
   runtimeMode: RuntimeMode;
@@ -59,6 +59,15 @@ export interface CreateKanbanCardInput {
   associatedWorktreePath?: string | null;
   associatedWorktreeBranch?: string | null;
   associatedWorktreeRef?: string | null;
+}
+
+export interface UpdateKanbanCardInput {
+  cardId: KanbanCardId;
+  title?: string;
+  description?: string | null;
+  specPath?: string | null;
+  modelSelection?: ModelSelection;
+  runtimeMode?: RuntimeMode;
 }
 
 export interface UpsertKanbanTaskInput {
@@ -89,6 +98,7 @@ export interface KanbanStoreState extends KanbanStoreData {
   subscribeKanbanBoard: (boardId: KanbanBoardId) => Promise<() => Promise<void>>;
   createKanbanBoard: (input: CreateKanbanBoardInput) => Promise<void>;
   createKanbanCard: (input: CreateKanbanCardInput) => Promise<void>;
+  updateKanbanCard: (input: UpdateKanbanCardInput) => Promise<void>;
   upsertKanbanTask: (input: UpsertKanbanTaskInput) => Promise<void>;
   deleteKanbanTask: (input: DeleteKanbanTaskInput) => Promise<void>;
   applyKanbanBoardEvent: (event: KanbanEvent) => void;
@@ -433,7 +443,7 @@ function createCardCommand(input: CreateKanbanCardInput): ClientKanbanCommand {
     sourceThreadId: input.sourceThreadId ?? null,
     title: input.title,
     ...(input.description ? { description: input.description } : {}),
-    specPath: input.specPath,
+    ...(input.specPath ? { specPath: input.specPath } : {}),
     tasks: (input.tasks ?? []).map((task, index) => ({
       taskId: task.taskId ?? taskId(),
       title: task.title,
@@ -449,6 +459,20 @@ function createCardCommand(input: CreateKanbanCardInput): ClientKanbanCommand {
     associatedWorktreeBranch: input.associatedWorktreeBranch ?? null,
     associatedWorktreeRef: input.associatedWorktreeRef ?? null,
     createdAt,
+  };
+}
+
+function createCardUpdateCommand(input: UpdateKanbanCardInput): ClientKanbanCommand {
+  return {
+    type: "kanban.card.update",
+    commandId: commandId(),
+    cardId: input.cardId,
+    ...(input.title !== undefined ? { title: input.title } : {}),
+    ...(input.description !== undefined ? { description: input.description } : {}),
+    ...(input.specPath !== undefined ? { specPath: input.specPath } : {}),
+    ...(input.modelSelection !== undefined ? { modelSelection: input.modelSelection } : {}),
+    ...(input.runtimeMode !== undefined ? { runtimeMode: input.runtimeMode } : {}),
+    updatedAt: nowIso(),
   };
 }
 
@@ -651,6 +675,9 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
   },
   createKanbanCard: async (input) => {
     await ensureNativeApi().kanban.dispatchCommand(createCardCommand(input));
+  },
+  updateKanbanCard: async (input) => {
+    await ensureNativeApi().kanban.dispatchCommand(createCardUpdateCommand(input));
   },
   upsertKanbanTask: async (input) => {
     await ensureNativeApi().kanban.dispatchCommand(createTaskUpsertCommand(input));

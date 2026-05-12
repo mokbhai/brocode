@@ -224,7 +224,7 @@ export function KanbanCreateCardDialog({
                   <SelectTrigger aria-label="Card source">
                     <SelectValue>
                       {mode === "thread"
-                        ? "Thread and spec path"
+                        ? "Thread"
                         : mode === "manual"
                           ? "Inline spec"
                           : "Spec path"}
@@ -235,7 +235,7 @@ export function KanbanCreateCardDialog({
                       Spec path
                     </SelectItem>
                     <SelectItem hideIndicator value="thread">
-                      Thread and spec path
+                      Thread
                     </SelectItem>
                     <SelectItem hideIndicator value="manual">
                       Inline spec
@@ -299,9 +299,9 @@ export function KanbanCreateCardDialog({
             <Field
               label="Spec path"
               hint={
-                mode === "manual"
-                  ? "Required reference path for the card. Inline notes stay in the description."
-                  : undefined
+                mode === "specPath"
+                  ? "Required for spec path cards."
+                  : "Optional reference path for this card."
               }
             >
               <Input

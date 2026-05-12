@@ -20,6 +20,7 @@ import { groupKanbanCardsByColumn } from "./kanbanBoard.logic";
 import type {
   CreateKanbanCardInput,
   DeleteKanbanTaskInput,
+  UpdateKanbanCardInput,
   UpsertKanbanTaskInput,
 } from "../../kanbanStore";
 import type { KanbanCreateCardMode } from "./kanbanCreateCard.logic";
@@ -33,6 +34,7 @@ export interface KanbanBoardProps {
   readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onStartRun?: (card: KanbanCardRecord) => void;
+  readonly onUpdateCard?: (input: UpdateKanbanCardInput) => Promise<void> | void;
   readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
   readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
   readonly initialCreateCardOpen?: boolean;
@@ -52,6 +54,7 @@ export function KanbanBoard({
   onOpenWorkerThread,
   onOpenReviewerThread,
   onStartRun,
+  onUpdateCard,
   onUpsertTask,
   onDeleteTask,
   initialCreateCardOpen = false,
@@ -169,6 +172,7 @@ export function KanbanBoard({
         onOpenWorkerThread={onOpenWorkerThread}
         onOpenReviewerThread={onOpenReviewerThread}
         onStartRun={onStartRun}
+        onUpdateCard={onUpdateCard}
         onUpsertTask={onUpsertTask}
         onDeleteTask={onDeleteTask}
       />

@@ -14,7 +14,7 @@ const boardId = "board-1" as KanbanBoardId;
 const projectId = "project-1" as ProjectId;
 
 describe("buildCreateKanbanCardInput", () => {
-  it("builds a create-from-thread payload and preserves model/runtime contract fields", () => {
+  it("builds a create-from-thread payload with an optional spec path", () => {
     const modelSelection = {
       provider: "claudeAgent",
       model: "claude-sonnet-4-6",
@@ -26,7 +26,6 @@ describe("buildCreateKanbanCardInput", () => {
       mode: "thread",
       title: "Implement review loop",
       sourceThreadId: "thread-1" as ThreadId,
-      specPath: "docs/review-loop.md",
       modelSelection,
       runtimeMode: "approval-required",
       tasks: [
@@ -43,7 +42,6 @@ describe("buildCreateKanbanCardInput", () => {
       projectId,
       sourceThreadId: "thread-1",
       title: "Implement review loop",
-      specPath: "docs/review-loop.md",
       modelSelection,
       runtimeMode: "approval-required",
       tasks: [
@@ -55,6 +53,7 @@ describe("buildCreateKanbanCardInput", () => {
         },
       ],
     });
+    expect(input.specPath).toBeUndefined();
   });
 
   it("builds a create-from-spec-path payload with default codex model and runtime", () => {
@@ -85,18 +84,17 @@ describe("buildCreateKanbanCardInput", () => {
     });
   });
 
-  it("builds a manual payload with an explicit spec path and inline notes", () => {
+  it("builds a manual payload with optional spec path and inline notes", () => {
     const input = buildCreateKanbanCardInput({
       boardId,
       projectId,
       mode: "manual",
       title: "Polish empty state",
-      specPath: "docs/manual-empty-state.md",
       inlineSpec: "Make the no-card column easier to scan.",
       tasksText: "- Tighten copy\n- Keep layout stable",
     });
 
-    expect(input.specPath).toBe("docs/manual-empty-state.md");
+    expect(input.specPath).toBeUndefined();
     expect(input.description).toBe("Inline spec:\n\nMake the no-card column easier to scan.");
     expect(input.tasks).toEqual([
       { title: "Tighten copy", status: "todo", order: 0 },
@@ -119,8 +117,8 @@ describe("buildCreateKanbanCardInput", () => {
       buildCreateKanbanCardInput({
         boardId,
         projectId,
-        mode: "manual",
-        title: "Manual card",
+        mode: "specPath",
+        title: "Spec card",
         specPath: " ",
       }),
     ).toThrow("Spec path is required");

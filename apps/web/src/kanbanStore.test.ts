@@ -419,7 +419,7 @@ describe("kanbanStore state", () => {
     expect(useKanbanStore.getState().removeBoardEventListenerByBoardId[boardId]).toBeUndefined();
   });
 
-  it("dispatches create-card and task-upsert commands through the native Kanban API", async () => {
+  it("dispatches create-card, card-update, and task commands through the native Kanban API", async () => {
     dispatchCommand.mockResolvedValue({ sequence: 4 });
 
     await useKanbanStore.getState().createKanbanBoard({
@@ -433,10 +433,16 @@ describe("kanbanStore state", () => {
       projectId,
       sourceThreadId: "thread-1" as ThreadId,
       title: "Implement Kanban UI",
-      specPath: "docs/spec.md",
       tasks: [{ taskId, title: "Create board", status: "todo", order: 0 }],
       modelSelection: { provider: "codex", model: "gpt-5-codex" },
       runtimeMode: "full-access",
+    });
+    await useKanbanStore.getState().updateKanbanCard({
+      cardId,
+      title: "Implement Kanban board UI",
+      description: null,
+      specPath: null,
+      runtimeMode: "approval-required",
     });
     await useKanbanStore.getState().upsertKanbanTask({
       cardId,
@@ -466,8 +472,10 @@ describe("kanbanStore state", () => {
       projectId,
       title: "Implement Kanban UI",
       sourceThreadId: "thread-1",
-      specPath: "docs/spec.md",
     });
+    expect(
+      commands[1]?.type === "kanban.card.create" ? commands[1].specPath : null,
+    ).toBeUndefined();
     expect(commands[1]?.type === "kanban.card.create" ? commands[1].tasks : []).toEqual([
       {
         taskId,
@@ -477,6 +485,14 @@ describe("kanbanStore state", () => {
       },
     ]);
     expect(commands[2]).toMatchObject({
+      type: "kanban.card.update",
+      cardId,
+      title: "Implement Kanban board UI",
+      description: null,
+      specPath: null,
+      runtimeMode: "approval-required",
+    });
+    expect(commands[3]).toMatchObject({
       type: "kanban.task.upsert",
       cardId,
       task: {
@@ -486,7 +502,7 @@ describe("kanbanStore state", () => {
         order: 1,
       },
     });
-    expect(commands[3]).toMatchObject({
+    expect(commands[4]).toMatchObject({
       type: "kanban.task.delete",
       cardId,
       taskId,

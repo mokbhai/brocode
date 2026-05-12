@@ -90,6 +90,15 @@ function findRun(readModel: KanbanReadModel, runId: KanbanRunId): KanbanRun | un
   return readModel.runs.find((run) => run.id === runId);
 }
 
+function findTask(
+  readModel: KanbanReadModel,
+  input: { readonly cardId: KanbanCardId; readonly taskId: KanbanTask["id"] },
+): KanbanTask | undefined {
+  return readModel.tasks.find(
+    (task) => task.cardId === input.cardId && task.id === input.taskId,
+  );
+}
+
 function requireBoard(
   command: KanbanCommand,
   readModel: KanbanReadModel,
@@ -180,7 +189,7 @@ function buildCard(
     reviewerThreadIds: [],
     title: command.title,
     ...(command.description !== undefined ? { description: command.description } : {}),
-    specPath: command.specPath,
+    ...(command.specPath !== undefined ? { specPath: command.specPath } : {}),
     status: "draft",
     modelSelection: command.modelSelection,
     runtimeMode: command.runtimeMode,
@@ -311,9 +320,6 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
       if (findCard(readModel, command.cardId) !== undefined) {
         return yield* fail(command, `Card '${command.cardId}' already exists.`);
       }
-      if (command.specPath === undefined) {
-        return yield* fail(command, "Card creation requires specPath.");
-      }
 
       const card = buildCard(command);
       return {
@@ -333,9 +339,6 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
 
     case "kanban.card.update": {
       const card = yield* requireCard(command, readModel, command.cardId);
-      if (command.specPath === null) {
-        return yield* fail(command, "Card update cannot clear specPath.");
-      }
       return {
         ...eventBase({
           aggregateKind: "card",
@@ -383,6 +386,16 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
 
     case "kanban.task.delete": {
       yield* requireCard(command, readModel, command.cardId);
+      const existingTask = findTask(readModel, {
+        cardId: command.cardId,
+        taskId: command.taskId,
+      });
+      if (!existingTask) {
+        return yield* fail(
+          command,
+          `Task '${command.taskId}' does not exist on card '${command.cardId}'.`,
+        );
+      }
       return {
         ...eventBase({
           aggregateKind: "card",

@@ -4,6 +4,7 @@ import type {
   KanbanRun,
   KanbanTask,
   KanbanTaskStatus,
+  RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
@@ -43,7 +44,11 @@ import {
 } from "~/lib/icons";
 
 import { getKanbanCardStatusTitle } from "../../kanbanStatus";
-import type { DeleteKanbanTaskInput, UpsertKanbanTaskInput } from "../../kanbanStore";
+import type {
+  DeleteKanbanTaskInput,
+  UpdateKanbanCardInput,
+  UpsertKanbanTaskInput,
+} from "../../kanbanStore";
 import { createKanbanCardViewModel } from "./kanbanBoard.logic";
 
 export interface KanbanCardDetailPanelProps {
@@ -57,6 +62,7 @@ export interface KanbanCardDetailPanelProps {
   readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onStartRun?: (card: KanbanCard) => void;
+  readonly onUpdateCard?: (input: UpdateKanbanCardInput) => Promise<void> | void;
   readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
   readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
 }
@@ -105,8 +111,17 @@ const TASK_STATUS_LABELS: Record<KanbanTaskStatus, string> = {
   blocked: "Blocked",
 };
 
+const RUNTIME_MODE_LABELS: Record<RuntimeMode, string> = {
+  "full-access": "Full access",
+  "approval-required": "Approval required",
+};
+
 function isKanbanTaskStatus(value: string): value is KanbanTaskStatus {
   return value === "todo" || value === "in_progress" || value === "done" || value === "blocked";
+}
+
+function isRuntimeMode(value: string): value is RuntimeMode {
+  return value === "full-access" || value === "approval-required";
 }
 
 function DetailRow(props: { readonly label: string; readonly value: string | null | undefined }) {
@@ -140,10 +155,18 @@ export function KanbanCardDetailPanel({
   onOpenWorkerThread,
   onOpenReviewerThread,
   onStartRun,
+  onUpdateCard,
   onUpsertTask,
   onDeleteTask,
 }: KanbanCardDetailPanelProps) {
   const viewModel = card ? createKanbanCardViewModel(card, tasks) : null;
+  const [editingCard, setEditingCard] = useState(false);
+  const [cardTitle, setCardTitle] = useState("");
+  const [cardDescription, setCardDescription] = useState("");
+  const [cardSpecPath, setCardSpecPath] = useState("");
+  const [cardRuntimeMode, setCardRuntimeMode] = useState<RuntimeMode>("full-access");
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [cardSubmitting, setCardSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<KanbanTask["id"] | "new" | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
@@ -151,11 +174,22 @@ export function KanbanCardDetailPanel({
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<KanbanTask["id"] | null>(null);
+  const cardTitleInputId = "kanban-card-title-input";
+  const cardDescriptionInputId = "kanban-card-description-input";
+  const cardSpecPathInputId = "kanban-card-spec-path-input";
+  const cardErrorId = "kanban-card-form-error";
   const taskTitleInputId = "kanban-task-title-input";
   const taskDescriptionInputId = "kanban-task-description-input";
   const taskErrorId = "kanban-task-form-error";
 
   useEffect(() => {
+    setEditingCard(false);
+    setCardTitle(card?.title ?? "");
+    setCardDescription(card?.description ?? "");
+    setCardSpecPath(card?.specPath ?? "");
+    setCardRuntimeMode(card?.runtimeMode ?? "full-access");
+    setCardError(null);
+    setCardSubmitting(false);
     setEditingTaskId(null);
     setTaskTitle("");
     setTaskDescription("");
@@ -164,6 +198,52 @@ export function KanbanCardDetailPanel({
     setTaskSubmitting(false);
     setDeletingTaskId(null);
   }, [card?.id, open]);
+
+  const resetCardForm = () => {
+    setEditingCard(false);
+    setCardTitle(card?.title ?? "");
+    setCardDescription(card?.description ?? "");
+    setCardSpecPath(card?.specPath ?? "");
+    setCardRuntimeMode(card?.runtimeMode ?? "full-access");
+    setCardError(null);
+  };
+
+  const startEditingCard = () => {
+    setEditingCard(true);
+    setCardTitle(card?.title ?? "");
+    setCardDescription(card?.description ?? "");
+    setCardSpecPath(card?.specPath ?? "");
+    setCardRuntimeMode(card?.runtimeMode ?? "full-access");
+    setCardError(null);
+  };
+
+  const submitCard = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!card || !onUpdateCard || cardSubmitting) {
+      return;
+    }
+    const title = cardTitle.trim();
+    if (!title) {
+      setCardError("Card title is required");
+      return;
+    }
+    setCardSubmitting(true);
+    setCardError(null);
+    try {
+      await onUpdateCard({
+        cardId: card.id,
+        title,
+        description: cardDescription.trim() || null,
+        specPath: cardSpecPath.trim() || null,
+        runtimeMode: cardRuntimeMode,
+      });
+      setEditingCard(false);
+    } catch (error) {
+      setCardError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCardSubmitting(false);
+    }
+  };
 
   const resetTaskForm = () => {
     setEditingTaskId(null);
@@ -348,22 +428,117 @@ export function KanbanCardDetailPanel({
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Card details</h3>
-                <dl className="space-y-2 rounded-md border border-[color:var(--color-border-light)] p-3">
-                  <DetailRow label="Status" value={getKanbanCardStatusTitle(card.status)} />
-                  <DetailRow label="Spec" value={card.specPath} />
-                  <DetailRow
-                    label="Model"
-                    value={`${card.modelSelection.provider} / ${card.modelSelection.model}`}
-                  />
-                  <DetailRow label="Runtime" value={card.runtimeMode} />
-                  <DetailRow label="Branch" value={card.branch} />
-                  <DetailRow label="Worktree" value={card.worktreePath} />
-                  <DetailRow label="Linked branch" value={card.associatedWorktreeBranch} />
-                  <DetailRow label="Linked ref" value={card.associatedWorktreeRef} />
-                  <DetailRow label="Blocked by" value={card.blockerReason} />
-                  <DetailRow label="Updated" value={formatDateTime(card.updatedAt)} />
-                </dl>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium text-foreground">Card details</h3>
+                  {onUpdateCard && !editingCard ? (
+                    <Button size="sm" variant="outline" onClick={startEditingCard}>
+                      <SquarePenIcon />
+                      Edit
+                    </Button>
+                  ) : null}
+                </div>
+                {editingCard ? (
+                  <form
+                    className="space-y-2 rounded-md border border-[color:var(--color-border-light)] bg-muted/16 p-3"
+                    onSubmit={submitCard}
+                  >
+                    <label
+                      className="block text-xs font-medium text-foreground"
+                      htmlFor={cardTitleInputId}
+                    >
+                      Card title
+                    </label>
+                    <Input
+                      id={cardTitleInputId}
+                      value={cardTitle}
+                      onChange={(event) => setCardTitle(event.currentTarget.value)}
+                      placeholder="Card title"
+                      nativeInput
+                      aria-invalid={cardError ? true : undefined}
+                      aria-describedby={cardError ? cardErrorId : undefined}
+                    />
+                    <label
+                      className="block text-xs font-medium text-foreground"
+                      htmlFor={cardDescriptionInputId}
+                    >
+                      Description
+                    </label>
+                    <Textarea
+                      id={cardDescriptionInputId}
+                      value={cardDescription}
+                      onChange={(event) => setCardDescription(event.currentTarget.value)}
+                      placeholder="Optional context"
+                    />
+                    <label
+                      className="block text-xs font-medium text-foreground"
+                      htmlFor={cardSpecPathInputId}
+                    >
+                      Spec path
+                    </label>
+                    <Input
+                      id={cardSpecPathInputId}
+                      value={cardSpecPath}
+                      onChange={(event) => setCardSpecPath(event.currentTarget.value)}
+                      placeholder="docs/specs/kanban-task.md"
+                      nativeInput
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Select
+                        value={cardRuntimeMode}
+                        onValueChange={(value) => {
+                          if (isRuntimeMode(value)) {
+                            setCardRuntimeMode(value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-44" aria-label="Card runtime mode">
+                          <SelectValue>{RUNTIME_MODE_LABELS[cardRuntimeMode]}</SelectValue>
+                        </SelectTrigger>
+                        <SelectPopup>
+                          {Object.entries(RUNTIME_MODE_LABELS).map(([runtimeMode, label]) => (
+                            <SelectItem hideIndicator key={runtimeMode} value={runtimeMode}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectPopup>
+                      </Select>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" size="sm" variant="ghost" onClick={resetCardForm}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" size="sm" disabled={cardSubmitting}>
+                          Save card
+                        </Button>
+                      </div>
+                    </div>
+                    {cardError ? (
+                      <div
+                        id={cardErrorId}
+                        role="alert"
+                        aria-live="polite"
+                        className="rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive-foreground"
+                      >
+                        {cardError}
+                      </div>
+                    ) : null}
+                  </form>
+                ) : (
+                  <dl className="space-y-2 rounded-md border border-[color:var(--color-border-light)] p-3">
+                    <DetailRow label="Status" value={getKanbanCardStatusTitle(card.status)} />
+                    <DetailRow label="Spec" value={card.specPath} />
+                    <DetailRow
+                      label="Model"
+                      value={`${card.modelSelection.provider} / ${card.modelSelection.model}`}
+                    />
+                    <DetailRow label="Runtime" value={card.runtimeMode} />
+                    <DetailRow label="Branch" value={card.branch} />
+                    <DetailRow label="Worktree" value={card.worktreePath} />
+                    <DetailRow label="Linked branch" value={card.associatedWorktreeBranch} />
+                    <DetailRow label="Linked ref" value={card.associatedWorktreeRef} />
+                    <DetailRow label="Blocked by" value={card.blockerReason} />
+                    <DetailRow label="Updated" value={formatDateTime(card.updatedAt)} />
+                  </dl>
+                )}
               </section>
 
               <section className="space-y-3">

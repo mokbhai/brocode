@@ -102,7 +102,7 @@ export function buildCreateKanbanCardInput(
   const description = optionalTrimmed(options.description);
 
   if (options.mode === "manual") {
-    const specPath = trimRequired(options.specPath, "Spec path");
+    const specPath = optionalTrimmed(options.specPath);
     const inlineSpec = optionalTrimmed(options.inlineSpec);
     const manualDescription = inlineSpec
       ? description
@@ -115,14 +115,17 @@ export function buildCreateKanbanCardInput(
       sourceThreadId: null,
       title,
       ...(manualDescription ? { description: manualDescription } : {}),
-      specPath,
+      ...(specPath ? { specPath } : {}),
       tasks,
       modelSelection,
       runtimeMode,
     };
   }
 
-  const specPath = trimRequired(options.specPath, "Spec path");
+  const specPath =
+    options.mode === "specPath"
+      ? trimRequired(options.specPath, "Spec path")
+      : optionalTrimmed(options.specPath);
   return {
     boardId: options.boardId,
     projectId: options.projectId,
@@ -132,7 +135,7 @@ export function buildCreateKanbanCardInput(
         : null,
     title,
     ...(description ? { description } : {}),
-    specPath,
+    ...(specPath ? { specPath } : {}),
     tasks,
     modelSelection,
     runtimeMode,
