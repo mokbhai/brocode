@@ -305,9 +305,9 @@ export function KanbanCardDetailPanel({
                         </div>
                         {review.findings.length > 0 ? (
                           <ul className="mt-2 space-y-1">
-                            {review.findings.map((finding) => (
+                            {review.findings.map((finding, index) => (
                               <li
-                                key={finding}
+                                key={`${review.id}:${index}`}
                                 className="break-words text-xs leading-5 text-muted-foreground"
                               >
                                 {finding}

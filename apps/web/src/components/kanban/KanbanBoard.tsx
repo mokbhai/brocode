@@ -1,4 +1,9 @@
-import type { KanbanBoardSnapshot, KanbanCard, KanbanCardId, ThreadId } from "@t3tools/contracts";
+import type {
+  KanbanBoardSnapshot,
+  KanbanCard as KanbanCardRecord,
+  KanbanCardId,
+  ThreadId,
+} from "@t3tools/contracts";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -13,11 +18,11 @@ import { groupKanbanCardsByColumn } from "./kanbanBoard.logic";
 export interface KanbanBoardProps {
   readonly snapshot: KanbanBoardSnapshot;
   readonly selectedCardId?: KanbanCardId | null;
-  readonly onSelectCard?: (cardId: KanbanCardId | null, card?: KanbanCard) => void;
+  readonly onSelectCard?: (cardId: KanbanCardId | null, card?: KanbanCardRecord) => void;
   readonly onCreateCard?: (snapshot: KanbanBoardSnapshot) => void;
-  readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCard) => void;
-  readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCard) => void;
-  readonly onStartRun?: (card: KanbanCard) => void;
+  readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
+  readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
+  readonly onStartRun?: (card: KanbanCardRecord) => void;
   readonly className?: string;
 }
 
