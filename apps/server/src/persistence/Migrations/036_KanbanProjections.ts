@@ -122,7 +122,7 @@ export default Effect.gen(function* () {
   `;
 
   yield* sql`
-    CREATE INDEX IF NOT EXISTS idx_projection_kanban_runs_card_status_updated
+    CREATE INDEX IF NOT EXISTS idx_projection_kanban_runs_card_status_started
     ON projection_kanban_runs(card_id, status, started_at)
   `;
 

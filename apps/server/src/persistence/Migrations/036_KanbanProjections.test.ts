@@ -96,7 +96,7 @@ layer("036_KanbanProjections", (it) => {
         "idx_projection_kanban_tasks_status_updated",
       ]);
       assert.includeMembers(yield* indexNames(sql, "projection_kanban_runs"), [
-        "idx_projection_kanban_runs_card_status_updated",
+        "idx_projection_kanban_runs_card_status_started",
       ]);
       assert.includeMembers(yield* indexNames(sql, "projection_kanban_reviews"), [
         "idx_projection_kanban_reviews_card_completed",
