@@ -1,4 +1,5 @@
 import type { KanbanTaskStatus } from "@t3tools/contracts";
+import type { KeyboardEvent } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { CircleAlertIcon, CircleCheckIcon, ListChecksIcon, Loader2Icon } from "~/lib/icons";
@@ -30,19 +31,33 @@ export function KanbanCard({ viewModel, selected = false, onSelect }: KanbanCard
   const { card, tasks } = viewModel;
   const previewTasks = tasks.slice(0, 3);
   const hiddenTaskCount = Math.max(0, tasks.length - previewTasks.length);
+  const interactiveProps = onSelect
+    ? {
+        role: "button",
+        tabIndex: 0,
+        onClick: onSelect,
+        onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+          if (event.key !== "Enter" && event.key !== " ") {
+            return;
+          }
+          event.preventDefault();
+          onSelect();
+        },
+      }
+    : {};
 
   return (
-    <button
-      type="button"
+    <article
       className={cn(
         "group flex min-h-[132px] w-full flex-col gap-3 rounded-md border bg-[var(--color-background-elevated-primary-opaque)] p-3 text-left shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/70",
         selected
           ? "border-primary/70 bg-primary/5"
-          : "border-[color:var(--color-border-light)] hover:border-[color:var(--color-border)] hover:bg-[var(--color-background-elevated-secondary)]",
+          : "border-[color:var(--color-border-light)]",
+        onSelect &&
+          "cursor-pointer hover:border-[color:var(--color-border)] hover:bg-[var(--color-background-elevated-secondary)]",
       )}
-      aria-pressed={selected}
-      disabled={!onSelect}
-      onClick={onSelect}
+      aria-pressed={onSelect ? selected : undefined}
+      {...interactiveProps}
     >
       <div className="min-w-0 space-y-1.5">
         <div className="line-clamp-2 break-words text-sm font-medium leading-5 text-foreground">
@@ -109,6 +124,6 @@ export function KanbanCard({ viewModel, selected = false, onSelect }: KanbanCard
           </div>
         ) : null}
       </div>
-    </button>
+    </article>
   );
 }
