@@ -151,6 +151,9 @@ export function KanbanCardDetailPanel({
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState<KanbanTask["id"] | null>(null);
+  const taskTitleInputId = "kanban-task-title-input";
+  const taskDescriptionInputId = "kanban-task-description-input";
+  const taskErrorId = "kanban-task-form-error";
 
   useEffect(() => {
     setEditingTaskId(null);
@@ -378,13 +381,29 @@ export function KanbanCardDetailPanel({
                     className="space-y-2 rounded-md border border-[color:var(--color-border-light)] bg-muted/16 p-3"
                     onSubmit={submitTask}
                   >
+                    <label
+                      className="block text-xs font-medium text-foreground"
+                      htmlFor={taskTitleInputId}
+                    >
+                      Task title
+                    </label>
                     <Input
+                      id={taskTitleInputId}
                       value={taskTitle}
                       onChange={(event) => setTaskTitle(event.currentTarget.value)}
                       placeholder="Task title"
                       nativeInput
+                      aria-invalid={taskError ? true : undefined}
+                      aria-describedby={taskError ? taskErrorId : undefined}
                     />
+                    <label
+                      className="block text-xs font-medium text-foreground"
+                      htmlFor={taskDescriptionInputId}
+                    >
+                      Task notes
+                    </label>
                     <Textarea
+                      id={taskDescriptionInputId}
                       value={taskDescription}
                       onChange={(event) => setTaskDescription(event.currentTarget.value)}
                       placeholder="Optional task notes"
@@ -419,7 +438,14 @@ export function KanbanCardDetailPanel({
                       </div>
                     </div>
                     {taskError ? (
-                      <div className="text-xs text-destructive-foreground">{taskError}</div>
+                      <div
+                        id={taskErrorId}
+                        role="alert"
+                        aria-live="polite"
+                        className="text-xs text-destructive-foreground"
+                      >
+                        {taskError}
+                      </div>
                     ) : null}
                   </form>
                 ) : null}

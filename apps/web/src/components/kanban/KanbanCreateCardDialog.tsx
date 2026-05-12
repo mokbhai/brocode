@@ -102,6 +102,7 @@ export function KanbanCreateCardDialog({
   const [tasksText, setTasksText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const formErrorId = "kanban-create-card-error";
 
   const resetForm = () => {
     setMode("specPath");
@@ -317,7 +318,12 @@ export function KanbanCreateCardDialog({
             </Field>
 
             {error ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive-foreground">
+              <div
+                id={formErrorId}
+                role="alert"
+                aria-live="polite"
+                className="rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive-foreground"
+              >
                 {error}
               </div>
             ) : null}
