@@ -4,6 +4,7 @@ import type {
   KanbanCardId,
   ThreadId,
 } from "@t3tools/contracts";
+import { useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -12,8 +13,10 @@ import { PlusIcon, PlayIcon } from "~/lib/icons";
 import { cn } from "~/lib/utils";
 
 import { KanbanCard } from "./KanbanCard";
+import { KanbanCreateCardDialog } from "./KanbanCreateCardDialog";
 import { KanbanCardDetailPanel } from "./KanbanCardDetailPanel";
 import { groupKanbanCardsByColumn } from "./kanbanBoard.logic";
+import { useKanbanStore } from "../../kanbanStore";
 
 export interface KanbanBoardProps {
   readonly snapshot: KanbanBoardSnapshot;
@@ -36,6 +39,9 @@ export function KanbanBoard({
   onStartRun,
   className,
 }: KanbanBoardProps) {
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const createKanbanCard = useKanbanStore((state) => state.createKanbanCard);
+  const upsertKanbanTask = useKanbanStore((state) => state.upsertKanbanTask);
   const columns = groupKanbanCardsByColumn(snapshot.cards, snapshot.tasksByCardId);
   const selectedCard = selectedCardId
     ? snapshot.cards.find((card) => card.id === selectedCardId) ?? null
@@ -63,17 +69,21 @@ export function KanbanBoard({
               <PlayIcon />
             </Button>
           ) : null}
-          {onCreateCard ? (
-            <Button
-              size="icon-sm"
-              variant="outline"
-              aria-label="Create Kanban card"
-              title="Create Kanban card"
-              onClick={() => onCreateCard(snapshot)}
-            >
-              <PlusIcon />
-            </Button>
-          ) : null}
+          <Button
+            size="icon-sm"
+            variant="outline"
+            aria-label="Create Kanban card"
+            title="Create Kanban card"
+            onClick={() => {
+              if (onCreateCard) {
+                onCreateCard(snapshot);
+                return;
+              }
+              setCreateDialogOpen(true);
+            }}
+          >
+            <PlusIcon />
+          </Button>
         </div>
       </div>
 
@@ -134,6 +144,14 @@ export function KanbanBoard({
         onOpenWorkerThread={onOpenWorkerThread}
         onOpenReviewerThread={onOpenReviewerThread}
         onStartRun={onStartRun}
+        onUpsertTask={upsertKanbanTask}
+      />
+
+      <KanbanCreateCardDialog
+        snapshot={snapshot}
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreateCard={createKanbanCard}
       />
     </div>
   );

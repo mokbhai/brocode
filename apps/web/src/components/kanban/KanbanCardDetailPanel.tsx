@@ -1,8 +1,23 @@
-import type { KanbanCard, KanbanReview, KanbanRun, KanbanTask, ThreadId } from "@t3tools/contracts";
-import type { ReactNode } from "react";
+import type {
+  KanbanCard,
+  KanbanReview,
+  KanbanRun,
+  KanbanTask,
+  KanbanTaskStatus,
+  ThreadId,
+} from "@t3tools/contracts";
+import { type FormEvent, type ReactNode, useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   Sheet,
   SheetDescription,
@@ -11,6 +26,7 @@ import {
   SheetPopup,
   SheetTitle,
 } from "~/components/ui/sheet";
+import { Textarea } from "~/components/ui/textarea";
 import {
   BotIcon,
   CircleAlertIcon,
@@ -18,11 +34,14 @@ import {
   ExternalLinkIcon,
   GitForkIcon,
   ListChecksIcon,
+  PlusIcon,
   PlayIcon,
   RefreshCwIcon,
+  SquarePenIcon,
 } from "~/lib/icons";
 
 import { getKanbanCardStatusTitle } from "../../kanbanStatus";
+import type { UpsertKanbanTaskInput } from "../../kanbanStore";
 import { createKanbanCardViewModel } from "./kanbanBoard.logic";
 
 export interface KanbanCardDetailPanelProps {
@@ -35,6 +54,7 @@ export interface KanbanCardDetailPanelProps {
   readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onStartRun?: (card: KanbanCard) => void;
+  readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
 }
 
 function formatDateTime(value: string): string {
@@ -74,6 +94,17 @@ function reviewBadgeVariant(outcome: KanbanReview["outcome"]) {
   }
 }
 
+const TASK_STATUS_LABELS: Record<KanbanTaskStatus, string> = {
+  todo: "Todo",
+  in_progress: "In progress",
+  done: "Done",
+  blocked: "Blocked",
+};
+
+function isKanbanTaskStatus(value: string): value is KanbanTaskStatus {
+  return value === "todo" || value === "in_progress" || value === "done" || value === "blocked";
+}
+
 function DetailRow(props: { readonly label: string; readonly value: string | null | undefined }) {
   if (!props.value) {
     return null;
@@ -104,8 +135,72 @@ export function KanbanCardDetailPanel({
   onOpenWorkerThread,
   onOpenReviewerThread,
   onStartRun,
+  onUpsertTask,
 }: KanbanCardDetailPanelProps) {
   const viewModel = card ? createKanbanCardViewModel(card, tasks) : null;
+  const [editingTaskId, setEditingTaskId] = useState<KanbanTask["id"] | "new" | null>(null);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskStatus, setTaskStatus] = useState<KanbanTaskStatus>("todo");
+  const [taskError, setTaskError] = useState<string | null>(null);
+  const [taskSubmitting, setTaskSubmitting] = useState(false);
+
+  const resetTaskForm = () => {
+    setEditingTaskId(null);
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskStatus("todo");
+    setTaskError(null);
+  };
+
+  const startAddingTask = () => {
+    setEditingTaskId("new");
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskStatus("todo");
+    setTaskError(null);
+  };
+
+  const startEditingTask = (task: KanbanTask) => {
+    setEditingTaskId(task.id);
+    setTaskTitle(task.title);
+    setTaskDescription(task.description ?? "");
+    setTaskStatus(task.status);
+    setTaskError(null);
+  };
+
+  const submitTask = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!card || !onUpsertTask || taskSubmitting) {
+      return;
+    }
+    const title = taskTitle.trim();
+    if (!title) {
+      setTaskError("Task title is required");
+      return;
+    }
+    const existingTask =
+      editingTaskId && editingTaskId !== "new"
+        ? tasks.find((task) => task.id === editingTaskId)
+        : null;
+    setTaskSubmitting(true);
+    setTaskError(null);
+    try {
+      await onUpsertTask({
+        cardId: card.id,
+        ...(existingTask ? { taskId: existingTask.id } : {}),
+        title,
+        ...(taskDescription.trim() ? { description: taskDescription.trim() } : {}),
+        status: taskStatus,
+        order: existingTask?.order ?? tasks.length,
+      });
+      resetTaskForm();
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTaskSubmitting(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -215,7 +310,65 @@ export function KanbanCardDetailPanel({
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Tasks</h3>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium text-foreground">Tasks</h3>
+                  {onUpsertTask ? (
+                    <Button size="sm" variant="outline" onClick={startAddingTask}>
+                      <PlusIcon />
+                      Add task
+                    </Button>
+                  ) : null}
+                </div>
+                {editingTaskId ? (
+                  <form
+                    className="space-y-2 rounded-md border border-[color:var(--color-border-light)] bg-muted/16 p-3"
+                    onSubmit={submitTask}
+                  >
+                    <Input
+                      value={taskTitle}
+                      onChange={(event) => setTaskTitle(event.currentTarget.value)}
+                      placeholder="Task title"
+                      nativeInput
+                    />
+                    <Textarea
+                      value={taskDescription}
+                      onChange={(event) => setTaskDescription(event.currentTarget.value)}
+                      placeholder="Optional task notes"
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Select
+                        value={taskStatus}
+                        onValueChange={(value) => {
+                          if (isKanbanTaskStatus(value)) {
+                            setTaskStatus(value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-40" aria-label="Task status">
+                          <SelectValue>{TASK_STATUS_LABELS[taskStatus]}</SelectValue>
+                        </SelectTrigger>
+                        <SelectPopup>
+                          {Object.entries(TASK_STATUS_LABELS).map(([status, label]) => (
+                            <SelectItem hideIndicator key={status} value={status}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectPopup>
+                      </Select>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" size="sm" variant="ghost" onClick={resetTaskForm}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" size="sm" disabled={taskSubmitting}>
+                          Save task
+                        </Button>
+                      </div>
+                    </div>
+                    {taskError ? (
+                      <div className="text-xs text-destructive-foreground">{taskError}</div>
+                    ) : null}
+                  </form>
+                ) : null}
                 {tasks.length > 0 ? (
                   <div className="space-y-2">
                     {tasks.map((task) => (
@@ -243,6 +396,17 @@ export function KanbanCardDetailPanel({
                         <Badge size="sm" variant={task.status === "blocked" ? "error" : "outline"}>
                           {task.status.replaceAll("_", " ")}
                         </Badge>
+                        {onUpsertTask ? (
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Edit ${task.title}`}
+                            title="Edit task"
+                            onClick={() => startEditingTask(task)}
+                          >
+                            <SquarePenIcon />
+                          </Button>
+                        ) : null}
                       </div>
                     ))}
                   </div>
