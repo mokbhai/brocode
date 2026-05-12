@@ -33,13 +33,16 @@ type RpcClientInstance =
 
 type TransportState = "connecting" | "open" | "closed" | "disposed";
 interface StreamRestartOptions {
-  readonly reconnectOnFailure?: boolean;
+  readonly shouldReconnectOnFailure?: (cause: Cause.Cause<unknown>) => boolean;
 }
 
 class WsTransportRpcError extends Data.TaggedError("WsTransportRpcError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
+
+export const KANBAN_RPC_UNAVAILABLE_MESSAGE =
+  "Kanban RPC is not available until the Kanban engine is initialized";
 
 const makeRpcClient = RpcClient.make(WsRpcGroup);
 
@@ -94,8 +97,15 @@ export function shouldRestartKanbanBoardStream(
   return activeBoardIds.has(boardId);
 }
 
-export function shouldReconnectFailedStream(options?: StreamRestartOptions): boolean {
-  return options?.reconnectOnFailure !== false;
+export function shouldReconnectFailedKanbanBoardStream(cause: Cause.Cause<unknown>): boolean {
+  return causeToError(cause).message !== KANBAN_RPC_UNAVAILABLE_MESSAGE;
+}
+
+function shouldReconnectFailedStream(
+  cause: Cause.Cause<unknown>,
+  options?: StreamRestartOptions,
+): boolean {
+  return options?.shouldReconnectOnFailure?.(cause) ?? true;
 }
 
 export class WsTransport {
@@ -480,7 +490,7 @@ export class WsTransport {
       client[KANBAN_WS_METHODS.subscribeBoard](input as never),
       (event: KanbanEvent) => this.emit(KANBAN_WS_CHANNELS.boardEvent, event),
       restartBoard,
-      { reconnectOnFailure: false },
+      { shouldReconnectOnFailure: shouldReconnectFailedKanbanBoardStream },
     );
   }
 
@@ -504,7 +514,7 @@ export class WsTransport {
           if (wasStoppedIntentionally || this.disposed) {
             return;
           }
-          if (restart && Exit.isFailure(exit) && shouldReconnectFailedStream(options)) {
+          if (restart && Exit.isFailure(exit) && shouldReconnectFailedStream(exit.cause, options)) {
             window.setTimeout(
               () => {
                 if (!this.disposed && !this.streamCleanups.has(key)) {
