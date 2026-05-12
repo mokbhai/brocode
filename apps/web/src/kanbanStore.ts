@@ -410,6 +410,8 @@ export function selectKanbanTasksForCard(
   return snapshot?.tasksByCardId[cardIdToSelect] ?? [];
 }
 
+const pendingBoardSubscriptionByBoardId = new Map<string, Promise<void>>();
+
 function createCardCommand(input: CreateKanbanCardInput): ClientKanbanCommand {
   const createdAt = nowIso();
   return {
@@ -475,7 +477,11 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
       set((state) => ({
         snapshotsByBoardId: {
           ...state.snapshotsByBoardId,
-          [boardIdToLoad]: snapshot,
+          [boardIdToLoad]:
+            (state.snapshotsByBoardId[boardIdToLoad]?.snapshotSequence ?? -1) >
+            snapshot.snapshotSequence
+              ? state.snapshotsByBoardId[boardIdToLoad]
+              : snapshot,
         },
         loadingBoardIds: {
           ...state.loadingBoardIds,
@@ -500,8 +506,12 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
     const api = ensureNativeApi();
     const releaseBoardSubscription = async () => {
       const current = get();
+      const currentCount = current.subscriptionCountByBoardId[boardIdToSubscribe] ?? 0;
+      if (currentCount <= 0) {
+        return;
+      }
       const nextCount = Math.max(
-        (current.subscriptionCountByBoardId[boardIdToSubscribe] ?? 1) - 1,
+        currentCount - 1,
         0,
       );
       if (nextCount > 0) {
@@ -518,8 +528,8 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
         return;
       }
 
-      current.removeBoardEventListenerByBoardId[boardIdToSubscribe]?.();
-      await api.kanban.unsubscribeBoard({ boardId: boardIdToSubscribe });
+      const removeBoardEventListener =
+        current.removeBoardEventListenerByBoardId[boardIdToSubscribe];
       set((state) => ({
         subscribedBoardIds: {
           ...state.subscribedBoardIds,
@@ -534,8 +544,11 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
           [boardIdToSubscribe]: undefined,
         },
       }));
+      removeBoardEventListener?.();
+      await api.kanban.unsubscribeBoard({ boardId: boardIdToSubscribe });
     };
     const currentSubscriptionCount = get().subscriptionCountByBoardId[boardIdToSubscribe] ?? 0;
+    const pendingSubscription = pendingBoardSubscriptionByBoardId.get(boardIdToSubscribe);
     if (currentSubscriptionCount > 0) {
       set((state) => ({
         subscriptionCountByBoardId: {
@@ -547,6 +560,9 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
           [boardIdToSubscribe]: true,
         },
       }));
+      if (pendingSubscription) {
+        await pendingSubscription;
+      }
       let unsubscribed = false;
       return async () => {
         if (unsubscribed) {
@@ -560,12 +576,6 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
     const removeBoardEventListener = api.kanban.onBoardEvent((event) => {
       get().applyKanbanBoardEvent(event);
     });
-    try {
-      await api.kanban.subscribeBoard({ boardId: boardIdToSubscribe });
-    } catch (error) {
-      removeBoardEventListener();
-      throw error;
-    }
     set((state) => ({
       subscribedBoardIds: {
         ...state.subscribedBoardIds,
@@ -580,6 +590,32 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
         [boardIdToSubscribe]: removeBoardEventListener,
       },
     }));
+    const subscribePromise = api.kanban.subscribeBoard({ boardId: boardIdToSubscribe });
+    pendingBoardSubscriptionByBoardId.set(boardIdToSubscribe, subscribePromise);
+    try {
+      await subscribePromise;
+    } catch (error) {
+      pendingBoardSubscriptionByBoardId.delete(boardIdToSubscribe);
+      removeBoardEventListener();
+      set((state) => ({
+        subscribedBoardIds: {
+          ...state.subscribedBoardIds,
+          [boardIdToSubscribe]: false,
+        },
+        subscriptionCountByBoardId: {
+          ...state.subscriptionCountByBoardId,
+          [boardIdToSubscribe]: 0,
+        },
+        removeBoardEventListenerByBoardId: {
+          ...state.removeBoardEventListenerByBoardId,
+          [boardIdToSubscribe]: undefined,
+        },
+      }));
+      throw error;
+    }
+    if (pendingBoardSubscriptionByBoardId.get(boardIdToSubscribe) === subscribePromise) {
+      pendingBoardSubscriptionByBoardId.delete(boardIdToSubscribe);
+    }
 
     let unsubscribed = false;
     return async () => {

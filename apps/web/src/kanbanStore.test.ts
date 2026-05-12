@@ -196,6 +196,37 @@ describe("kanbanStore state", () => {
     expect(useKanbanStore.getState().loadingBoardIds[boardId]).toBe(false);
   });
 
+  it("does not replace a newer local snapshot with an older in-flight load", async () => {
+    let resolveSnapshot: (snapshot: KanbanBoardSnapshot) => void = () => {};
+    getSnapshot.mockReturnValue(
+      new Promise<KanbanBoardSnapshot>((resolve) => {
+        resolveSnapshot = resolve;
+      }),
+    );
+
+    const loadPromise = useKanbanStore.getState().loadKanbanSnapshot(boardId);
+    const freshSnapshot = makeSnapshot({
+      snapshotSequence: 5,
+      cards: [makeCard({ title: "Fresh event-applied title" })],
+    });
+    useKanbanStore.setState({
+      snapshotsByBoardId: {
+        [boardId]: freshSnapshot,
+      },
+    });
+    resolveSnapshot(
+      makeSnapshot({
+        snapshotSequence: 4,
+        cards: [makeCard({ title: "Older loaded title" })],
+      }),
+    );
+
+    await loadPromise;
+
+    expect(useKanbanStore.getState().snapshotsByBoardId[boardId]).toBe(freshSnapshot);
+    expect(useKanbanStore.getState().loadingBoardIds[boardId]).toBe(false);
+  });
+
   it("subscribes to board events and applies status updates locally", async () => {
     const snapshot = makeSnapshot();
     getSnapshot.mockResolvedValue(snapshot);
@@ -338,6 +369,54 @@ describe("kanbanStore state", () => {
     expect(unsubscribeBoardEvent).toHaveBeenCalledTimes(1);
     expect(useKanbanStore.getState().subscribedBoardIds[boardId]).toBe(false);
     expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(0);
+  });
+
+  it("coalesces concurrent board subscriptions into one native subscription", async () => {
+    let resolveSubscribe: () => void = () => {};
+    subscribeBoard.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSubscribe = resolve;
+      }),
+    );
+    unsubscribeBoard.mockResolvedValue(undefined);
+
+    const firstSubscribe = useKanbanStore.getState().subscribeKanbanBoard(boardId);
+    const secondSubscribe = useKanbanStore.getState().subscribeKanbanBoard(boardId);
+
+    expect(subscribeBoard).toHaveBeenCalledTimes(1);
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(2);
+
+    resolveSubscribe();
+    const [unsubscribeFirst, unsubscribeSecond] = await Promise.all([
+      firstSubscribe,
+      secondSubscribe,
+    ]);
+
+    await unsubscribeFirst();
+
+    expect(unsubscribeBoard).not.toHaveBeenCalled();
+    expect(unsubscribeBoardEvent).not.toHaveBeenCalled();
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(1);
+
+    await unsubscribeSecond();
+
+    expect(unsubscribeBoard).toHaveBeenCalledTimes(1);
+    expect(unsubscribeBoardEvent).toHaveBeenCalledTimes(1);
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(0);
+  });
+
+  it("clears local subscription state before surfacing native unsubscribe failures", async () => {
+    subscribeBoard.mockResolvedValue(undefined);
+    unsubscribeBoard.mockRejectedValue(new Error("native unsubscribe failed"));
+
+    const unsubscribe = await useKanbanStore.getState().subscribeKanbanBoard(boardId);
+
+    await expect(unsubscribe()).rejects.toThrow("native unsubscribe failed");
+
+    expect(unsubscribeBoardEvent).toHaveBeenCalledTimes(1);
+    expect(useKanbanStore.getState().subscribedBoardIds[boardId]).toBe(false);
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(0);
+    expect(useKanbanStore.getState().removeBoardEventListenerByBoardId[boardId]).toBeUndefined();
   });
 
   it("dispatches create-card and task-upsert commands through the native Kanban API", async () => {
