@@ -9,6 +9,8 @@ import {
   WsRpcError,
   WsRpcGroup,
   type GitActionProgressEvent,
+  type KanbanEvent,
+  type KanbanGetSnapshotInput,
   type OrchestrationEvent,
   type OrchestrationShellStreamEvent,
   type OrchestrationThreadStreamItem,
@@ -26,6 +28,11 @@ import { SessionCredentialService } from "./auth/Services/SessionCredentialServi
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery";
 import { ServerConfig } from "./config";
 import { importLegacyProjectThreads, listLegacyDataSources } from "./legacyDataImport";
+import { KanbanEngineService, type KanbanEngineShape } from "./kanban/Services/KanbanEngine";
+import {
+  KanbanSnapshotQuery,
+  type KanbanSnapshotQueryShape,
+} from "./kanban/Services/KanbanSnapshotQuery";
 import { GitCore } from "./git/Services/GitCore";
 import { GitManager } from "./git/Services/GitManager";
 import { GitStatusBroadcaster } from "./git/Services/GitStatusBroadcaster";
@@ -82,6 +89,98 @@ function isThreadDetailEvent(event: OrchestrationEvent): event is Extract<
   );
 }
 
+function makeKanbanBoardEventFilter(boardId: string, initialCardIds: ReadonlyArray<string>) {
+  const cardIds = new Set(initialCardIds);
+  return (event: KanbanEvent): boolean => {
+    switch (event.type) {
+      case "kanban.board.created":
+        return event.payload.board.id === boardId;
+      case "kanban.card.created":
+      case "kanban.card.updated":
+        if (event.payload.card.boardId !== boardId) {
+          return false;
+        }
+        cardIds.add(event.payload.card.id);
+        return true;
+      case "kanban.card.status-changed":
+      case "kanban.card.blocked":
+      case "kanban.card.approved":
+      case "kanban.card.ready-to-submit":
+        return cardIds.has(event.payload.cardId);
+      case "kanban.task.upserted":
+        return cardIds.has(event.payload.task.cardId);
+      case "kanban.task.deleted":
+        return cardIds.has(event.payload.cardId);
+      case "kanban.run.started":
+      case "kanban.run.completed":
+        return cardIds.has(event.payload.run.cardId);
+      case "kanban.review.completed":
+        return cardIds.has(event.payload.review.cardId);
+    }
+  };
+}
+
+function boardHistoryEventStream(input: {
+  readonly boardId: string;
+  readonly snapshotSequence: number;
+  readonly initialCardIds: ReadonlyArray<string>;
+  readonly kanbanEngine: KanbanEngineShape;
+}) {
+  return input.kanbanEngine.readEvents(0).pipe(
+    Stream.filter((event) => event.sequence <= input.snapshotSequence),
+    Stream.filter(makeKanbanBoardEventFilter(input.boardId, input.initialCardIds)),
+  );
+}
+
+export function makeKanbanWsHandlers(input: {
+  readonly kanbanEngine: KanbanEngineShape;
+  readonly kanbanSnapshotQuery: KanbanSnapshotQueryShape;
+}) {
+  const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
+    effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+
+  return {
+    [KANBAN_WS_METHODS.getSnapshot]: (snapshotInput: KanbanGetSnapshotInput) =>
+      rpcEffect(
+        input.kanbanSnapshotQuery.getSnapshot(snapshotInput),
+        "Failed to load Kanban board snapshot",
+      ),
+    [KANBAN_WS_METHODS.dispatchCommand]: (command) =>
+      rpcEffect(input.kanbanEngine.dispatch(command), "Failed to dispatch Kanban command"),
+    [KANBAN_WS_METHODS.subscribeBoard]: (subscribeInput) =>
+      Stream.unwrap(
+        input.kanbanSnapshotQuery.getSnapshot(subscribeInput).pipe(
+          Effect.map((snapshot) => {
+            const initialCardIds = snapshot.cards.map((card) => card.id);
+            const shouldIncludeHot = makeKanbanBoardEventFilter(
+              subscribeInput.boardId,
+              initialCardIds,
+            );
+            const history = boardHistoryEventStream({
+              boardId: subscribeInput.boardId,
+              snapshotSequence: snapshot.snapshotSequence,
+              initialCardIds,
+              kanbanEngine: input.kanbanEngine,
+            });
+            const hot = input.kanbanEngine.streamDomainEvents.pipe(
+              Stream.filter((event) => event.sequence > snapshot.snapshotSequence),
+              Stream.filter(shouldIncludeHot),
+            );
+            return Stream.concat(history, hot);
+          }),
+          Effect.mapError((cause) => toWsRpcError(cause, "Failed to subscribe to Kanban board")),
+        ),
+      ).pipe(Stream.mapError((cause) => toWsRpcError(cause, "Kanban board stream failed"))),
+    [KANBAN_WS_METHODS.unsubscribeBoard]: () => Effect.void,
+  } satisfies Pick<
+    Parameters<typeof WsRpcGroup.of>[0],
+    | typeof KANBAN_WS_METHODS.getSnapshot
+    | typeof KANBAN_WS_METHODS.dispatchCommand
+    | typeof KANBAN_WS_METHODS.subscribeBoard
+    | typeof KANBAN_WS_METHODS.unsubscribeBoard
+  >;
+}
+
 export const makeWsRpcLayer = () =>
   WsRpcGroup.toLayer(
     Effect.gen(function* () {
@@ -91,6 +190,8 @@ export const makeWsRpcLayer = () =>
       const git = yield* GitCore;
       const gitManager = yield* GitManager;
       const gitStatusBroadcaster = yield* GitStatusBroadcaster;
+      const kanbanEngine = yield* KanbanEngineService;
+      const kanbanSnapshotQuery = yield* KanbanSnapshotQuery;
       const keybindings = yield* Keybindings;
       const open = yield* Open;
       const orchestrationEngine = yield* OrchestrationEngineService;
@@ -249,10 +350,6 @@ export const makeWsRpcLayer = () =>
 
       const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
         effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
-      const kanbanUnavailable = () =>
-        new WsRpcError({
-          message: "Kanban RPC is not available until the Kanban engine is initialized",
-        });
 
       return WsRpcGroup.of({
         [ORCHESTRATION_WS_METHODS.dispatchCommand]: (command) =>
@@ -351,10 +448,7 @@ export const makeWsRpcLayer = () =>
         [ORCHESTRATION_WS_METHODS.unsubscribeThread]: () => Effect.void,
         [WS_METHODS.subscribeOrchestrationDomainEvents]: () =>
           orchestrationEngine.streamDomainEvents,
-        [KANBAN_WS_METHODS.getSnapshot]: () => Effect.fail(kanbanUnavailable()),
-        [KANBAN_WS_METHODS.dispatchCommand]: () => Effect.fail(kanbanUnavailable()),
-        [KANBAN_WS_METHODS.subscribeBoard]: () => Stream.fail(kanbanUnavailable()),
-        [KANBAN_WS_METHODS.unsubscribeBoard]: () => Effect.fail(kanbanUnavailable()),
+        ...makeKanbanWsHandlers({ kanbanEngine, kanbanSnapshotQuery }),
 
         [WS_METHODS.projectsListDirectories]: (input) =>
           rpcEffect(
