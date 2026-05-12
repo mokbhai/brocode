@@ -247,24 +247,31 @@ export function KanbanCreateCardDialog({
               </Field>
             ) : null}
 
+            <Field
+              label="Spec path"
+              hint={
+                mode === "manual"
+                  ? "Required reference path for the card. Inline notes stay in the description."
+                  : undefined
+              }
+            >
+              <Input
+                value={specPath}
+                onChange={(event) => setSpecPath(event.currentTarget.value)}
+                placeholder="docs/specs/kanban-task.md"
+                nativeInput
+              />
+            </Field>
+
             {mode === "manual" ? (
-              <Field label="Inline spec" hint="Saved in the card description with spec path inline-spec.md.">
+              <Field label="Inline spec" hint="Optional notes added to the card description.">
                 <Textarea
                   value={inlineSpec}
                   onChange={(event) => setInlineSpec(event.currentTarget.value)}
                   placeholder="Describe the implementation target"
                 />
               </Field>
-            ) : (
-              <Field label="Spec path">
-                <Input
-                  value={specPath}
-                  onChange={(event) => setSpecPath(event.currentTarget.value)}
-                  placeholder="docs/specs/kanban-task.md"
-                  nativeInput
-                />
-              </Field>
-            )}
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
               <Field label="Provider">

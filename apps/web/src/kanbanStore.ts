@@ -64,6 +64,11 @@ export interface UpsertKanbanTaskInput {
   order?: number;
 }
 
+export interface DeleteKanbanTaskInput {
+  cardId: KanbanCardId;
+  taskId: KanbanTaskId;
+}
+
 export interface KanbanStoreData {
   snapshotsByBoardId: Record<string, KanbanBoardSnapshot | undefined>;
   loadingBoardIds: Record<string, boolean | undefined>;
@@ -78,6 +83,7 @@ export interface KanbanStoreState extends KanbanStoreData {
   subscribeKanbanBoard: (boardId: KanbanBoardId) => Promise<() => Promise<void>>;
   createKanbanCard: (input: CreateKanbanCardInput) => Promise<void>;
   upsertKanbanTask: (input: UpsertKanbanTaskInput) => Promise<void>;
+  deleteKanbanTask: (input: DeleteKanbanTaskInput) => Promise<void>;
   applyKanbanBoardEvent: (event: KanbanEvent) => void;
 }
 
@@ -445,6 +451,16 @@ function createTaskUpsertCommand(input: UpsertKanbanTaskInput): ClientKanbanComm
   };
 }
 
+function createTaskDeleteCommand(input: DeleteKanbanTaskInput): ClientKanbanCommand {
+  return {
+    type: "kanban.task.delete",
+    commandId: commandId(),
+    cardId: input.cardId,
+    taskId: input.taskId,
+    deletedAt: nowIso(),
+  };
+}
+
 export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
   ...createInitialKanbanStoreState(),
   loadKanbanSnapshot: async (boardIdToLoad) => {
@@ -617,6 +633,9 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
   },
   upsertKanbanTask: async (input) => {
     await ensureNativeApi().kanban.dispatchCommand(createTaskUpsertCommand(input));
+  },
+  deleteKanbanTask: async (input) => {
+    await ensureNativeApi().kanban.dispatchCommand(createTaskDeleteCommand(input));
   },
   applyKanbanBoardEvent: (event) => {
     set((state) => {

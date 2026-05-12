@@ -128,6 +128,7 @@ function makeSnapshot(): KanbanBoardSnapshot {
 
 function KanbanBoardHarness(props: {
   readonly onCreateCard: ReturnType<typeof vi.fn>;
+  readonly onDeleteTask: ReturnType<typeof vi.fn>;
   readonly onOpenSourceThread: ReturnType<typeof vi.fn>;
   readonly onOpenReviewerThread: ReturnType<typeof vi.fn>;
   readonly onOpenWorkerThread: ReturnType<typeof vi.fn>;
@@ -144,6 +145,7 @@ function KanbanBoardHarness(props: {
       onOpenReviewerThread={props.onOpenReviewerThread}
       onOpenWorkerThread={props.onOpenWorkerThread}
       onStartRun={props.onStartRun}
+      onDeleteTask={props.onDeleteTask}
     />
   );
 }
@@ -154,6 +156,7 @@ async function mountBoard() {
   document.body.append(host);
 
   const onCreateCard = vi.fn();
+  const onDeleteTask = vi.fn();
   const onOpenSourceThread = vi.fn();
   const onOpenReviewerThread = vi.fn();
   const onOpenWorkerThread = vi.fn();
@@ -161,6 +164,7 @@ async function mountBoard() {
   const screen = await render(
     <KanbanBoardHarness
       onCreateCard={onCreateCard}
+      onDeleteTask={onDeleteTask}
       onOpenSourceThread={onOpenSourceThread}
       onOpenReviewerThread={onOpenReviewerThread}
       onOpenWorkerThread={onOpenWorkerThread}
@@ -175,6 +179,7 @@ async function mountBoard() {
       host.remove();
     },
     onCreateCard,
+    onDeleteTask,
     onOpenSourceThread,
     onOpenReviewerThread,
     onOpenWorkerThread,
@@ -195,7 +200,20 @@ describe("KanbanBoard", () => {
         .element(page.getByRole("heading", { name: "Ready", exact: true }))
         .toBeInTheDocument();
       await expect.element(page.getByText("Implement board components")).toBeInTheDocument();
+
       await page.getByLabelText("Create Kanban card").click();
+      await page.getByLabelText("Title").fill("Create from board test");
+      await page.getByLabelText("Spec path").fill("docs/browser-created-card.md");
+      document.querySelector<HTMLFormElement>("form")?.requestSubmit();
+
+      expect(mounted.onCreateCard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          boardId,
+          projectId,
+          title: "Create from board test",
+          specPath: "docs/browser-created-card.md",
+        }),
+      );
 
       await page.getByRole("button", { name: /Implement board components/ }).click();
 
@@ -206,6 +224,7 @@ describe("KanbanBoard", () => {
       await page.getByRole("button", { name: /Source thread/ }).click();
       await page.getByRole("button", { name: /Worker 1/ }).click();
       await page.getByRole("button", { name: /Reviewer 1/ }).click();
+      await page.getByRole("button", { name: /Delete Create card summary/ }).click();
 
       expect(mounted.onStartRun).toHaveBeenCalledWith(expect.objectContaining({ id: cardId }));
       expect(mounted.onOpenSourceThread).toHaveBeenCalledWith(
@@ -220,8 +239,8 @@ describe("KanbanBoard", () => {
         reviewerThreadId,
         expect.objectContaining({ id: cardId }),
       );
-      expect(mounted.onCreateCard).toHaveBeenCalledWith(
-        expect.objectContaining({ board: expect.objectContaining({ id: boardId }) }),
+      expect(mounted.onDeleteTask).toHaveBeenCalledWith(
+        expect.objectContaining({ cardId, taskId: "task-1" }),
       );
 
       await page.getByLabelText("Close").click();

@@ -16,17 +16,23 @@ import { KanbanCard } from "./KanbanCard";
 import { KanbanCreateCardDialog } from "./KanbanCreateCardDialog";
 import { KanbanCardDetailPanel } from "./KanbanCardDetailPanel";
 import { groupKanbanCardsByColumn } from "./kanbanBoard.logic";
-import { useKanbanStore } from "../../kanbanStore";
+import type {
+  CreateKanbanCardInput,
+  DeleteKanbanTaskInput,
+  UpsertKanbanTaskInput,
+} from "../../kanbanStore";
 
 export interface KanbanBoardProps {
   readonly snapshot: KanbanBoardSnapshot;
   readonly selectedCardId?: KanbanCardId | null;
   readonly onSelectCard?: (cardId: KanbanCardId | null, card?: KanbanCardRecord) => void;
-  readonly onCreateCard?: (snapshot: KanbanBoardSnapshot) => void;
+  readonly onCreateCard?: (input: CreateKanbanCardInput) => Promise<void> | void;
   readonly onOpenSourceThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onStartRun?: (card: KanbanCardRecord) => void;
+  readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
+  readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
   readonly className?: string;
 }
 
@@ -39,11 +45,11 @@ export function KanbanBoard({
   onOpenWorkerThread,
   onOpenReviewerThread,
   onStartRun,
+  onUpsertTask,
+  onDeleteTask,
   className,
 }: KanbanBoardProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const createKanbanCard = useKanbanStore((state) => state.createKanbanCard);
-  const upsertKanbanTask = useKanbanStore((state) => state.upsertKanbanTask);
   const columns = groupKanbanCardsByColumn(snapshot.cards, snapshot.tasksByCardId);
   const selectedCard = selectedCardId
     ? snapshot.cards.find((card) => card.id === selectedCardId) ?? null
@@ -76,13 +82,8 @@ export function KanbanBoard({
             variant="outline"
             aria-label="Create Kanban card"
             title="Create Kanban card"
-            onClick={() => {
-              if (onCreateCard) {
-                onCreateCard(snapshot);
-                return;
-              }
-              setCreateDialogOpen(true);
-            }}
+            disabled={!onCreateCard}
+            onClick={() => setCreateDialogOpen(true)}
           >
             <PlusIcon />
           </Button>
@@ -147,15 +148,18 @@ export function KanbanBoard({
         onOpenWorkerThread={onOpenWorkerThread}
         onOpenReviewerThread={onOpenReviewerThread}
         onStartRun={onStartRun}
-        onUpsertTask={upsertKanbanTask}
+        onUpsertTask={onUpsertTask}
+        onDeleteTask={onDeleteTask}
       />
 
-      <KanbanCreateCardDialog
-        snapshot={snapshot}
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onCreateCard={createKanbanCard}
-      />
+      {onCreateCard ? (
+        <KanbanCreateCardDialog
+          snapshot={snapshot}
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          onCreateCard={onCreateCard}
+        />
+      ) : null}
     </div>
   );
 }

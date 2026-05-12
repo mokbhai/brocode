@@ -11,8 +11,6 @@ import {
 
 import type { CreateKanbanCardInput, CreateKanbanCardTaskInput } from "../../kanbanStore";
 
-const INLINE_SPEC_PATH = "inline-spec.md";
-
 export type KanbanCreateCardMode = "thread" | "specPath" | "manual";
 
 export interface KanbanCreateCardTaskDraft {
@@ -104,16 +102,20 @@ export function buildCreateKanbanCardInput(
   const description = optionalTrimmed(options.description);
 
   if (options.mode === "manual") {
-    const inlineSpec = trimRequired(options.inlineSpec, "Inline spec");
+    const specPath = trimRequired(options.specPath, "Spec path");
+    const inlineSpec = optionalTrimmed(options.inlineSpec);
+    const manualDescription = inlineSpec
+      ? description
+        ? `${description}\n\nInline spec:\n\n${inlineSpec}`
+        : `Inline spec:\n\n${inlineSpec}`
+      : description;
     return {
       boardId: options.boardId,
       projectId: options.projectId,
       sourceThreadId: null,
       title,
-      description: description
-        ? `${description}\n\nInline spec:\n\n${inlineSpec}`
-        : `Inline spec:\n\n${inlineSpec}`,
-      specPath: INLINE_SPEC_PATH,
+      ...(manualDescription ? { description: manualDescription } : {}),
+      specPath,
       tasks,
       modelSelection,
       runtimeMode,

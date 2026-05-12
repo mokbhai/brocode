@@ -440,6 +440,10 @@ describe("kanbanStore state", () => {
       status: "in_progress",
       order: 1,
     });
+    await useKanbanStore.getState().deleteKanbanTask({
+      cardId,
+      taskId,
+    });
 
     const commands = dispatchCommand.mock.calls.map(([command]) =>
       decodeClientKanbanCommand(command),
@@ -470,6 +474,11 @@ describe("kanbanStore state", () => {
         status: "in_progress",
         order: 1,
       },
+    });
+    expect(commands[2]).toMatchObject({
+      type: "kanban.task.delete",
+      cardId,
+      taskId,
     });
   });
 });

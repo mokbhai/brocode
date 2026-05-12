@@ -6,7 +6,7 @@ import type {
   KanbanTaskStatus,
   ThreadId,
 } from "@t3tools/contracts";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -39,10 +39,11 @@ import {
   PlayIcon,
   RefreshCwIcon,
   SquarePenIcon,
+  XIcon,
 } from "~/lib/icons";
 
 import { getKanbanCardStatusTitle } from "../../kanbanStatus";
-import type { UpsertKanbanTaskInput } from "../../kanbanStore";
+import type { DeleteKanbanTaskInput, UpsertKanbanTaskInput } from "../../kanbanStore";
 import { createKanbanCardViewModel } from "./kanbanBoard.logic";
 
 export interface KanbanCardDetailPanelProps {
@@ -57,6 +58,7 @@ export interface KanbanCardDetailPanelProps {
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onStartRun?: (card: KanbanCard) => void;
   readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
+  readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
 }
 
 function formatDateTime(value: string): string {
@@ -139,6 +141,7 @@ export function KanbanCardDetailPanel({
   onOpenReviewerThread,
   onStartRun,
   onUpsertTask,
+  onDeleteTask,
 }: KanbanCardDetailPanelProps) {
   const viewModel = card ? createKanbanCardViewModel(card, tasks) : null;
   const [editingTaskId, setEditingTaskId] = useState<KanbanTask["id"] | "new" | null>(null);
@@ -147,6 +150,17 @@ export function KanbanCardDetailPanel({
   const [taskStatus, setTaskStatus] = useState<KanbanTaskStatus>("todo");
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskSubmitting, setTaskSubmitting] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<KanbanTask["id"] | null>(null);
+
+  useEffect(() => {
+    setEditingTaskId(null);
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskStatus("todo");
+    setTaskError(null);
+    setTaskSubmitting(false);
+    setDeletingTaskId(null);
+  }, [card?.id, open]);
 
   const resetTaskForm = () => {
     setEditingTaskId(null);
@@ -186,6 +200,10 @@ export function KanbanCardDetailPanel({
       editingTaskId && editingTaskId !== "new"
         ? tasks.find((task) => task.id === editingTaskId)
         : null;
+    if (editingTaskId && editingTaskId !== "new" && !existingTask) {
+      setTaskError("Task no longer exists");
+      return;
+    }
     setTaskSubmitting(true);
     setTaskError(null);
     try {
@@ -202,6 +220,27 @@ export function KanbanCardDetailPanel({
       setTaskError(error instanceof Error ? error.message : String(error));
     } finally {
       setTaskSubmitting(false);
+    }
+  };
+
+  const deleteTask = async (task: KanbanTask) => {
+    if (!card || !onDeleteTask || deletingTaskId) {
+      return;
+    }
+    setDeletingTaskId(task.id);
+    setTaskError(null);
+    try {
+      await onDeleteTask({
+        cardId: card.id,
+        taskId: task.id,
+      });
+      if (editingTaskId === task.id) {
+        resetTaskForm();
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeletingTaskId(null);
     }
   };
 
@@ -420,6 +459,20 @@ export function KanbanCardDetailPanel({
                             onClick={() => startEditingTask(task)}
                           >
                             <SquarePenIcon />
+                          </Button>
+                        ) : null}
+                        {onDeleteTask ? (
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={`Delete ${task.title}`}
+                            title="Delete task"
+                            disabled={deletingTaskId === task.id}
+                            onClick={() => {
+                              void deleteTask(task);
+                            }}
+                          >
+                            <XIcon />
                           </Button>
                         ) : null}
                       </div>
