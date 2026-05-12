@@ -480,6 +480,9 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
       if (run.role !== "reviewer") {
         return yield* fail(command, `Run '${command.review.runId}' is not a reviewer run.`);
       }
+      if (run.status !== "completed") {
+        return yield* fail(command, `Reviewer run '${command.review.runId}' is not completed.`);
+      }
       const outcome = reviewOutcomeStatus(command.review);
       yield* requireStatusTransition(command, card.status, outcome.toStatus);
       return [

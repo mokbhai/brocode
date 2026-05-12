@@ -367,6 +367,46 @@ describe("decideKanbanCommand", () => {
     expect(String(workerRunExit.cause)).toContain("reviewer");
   });
 
+  it.each(["running", "failed", "interrupted"] as const)(
+    "rejects review completion when the reviewer run is %s",
+    async (runStatus) => {
+      const exit = await runDecisionExit(
+        {
+          type: "kanban.review.complete",
+          commandId: CommandId.makeUnsafe(`cmd_review_${runStatus}`),
+          review: {
+            id: KanbanReviewId.makeUnsafe(`review_${runStatus}`),
+            cardId,
+            runId: KanbanRunId.makeUnsafe(`run_${runStatus}`),
+            reviewerThreadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+            outcome: "approved",
+            summary: "Looks ready",
+            findings: [],
+            completedAt: now,
+          },
+        },
+        {
+          ...readModelWithBoard(),
+          cards: [readyCard("reviewing")],
+          runs: [
+            {
+              id: KanbanRunId.makeUnsafe(`run_${runStatus}`),
+              cardId,
+              role: "reviewer",
+              status: runStatus,
+              threadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+              startedAt: now,
+              ...(runStatus === "running" ? {} : { completedAt: now }),
+            },
+          ],
+        },
+      );
+
+      expect(exit._tag).toBe("Failure");
+      expect(String(exit.cause)).toContain("completed");
+    },
+  );
+
   it("emits a needs-work status change before recording a needs-work review", async () => {
     const result = await runDecision(
       {
