@@ -54,14 +54,11 @@ export type KanbanTaskStatus = typeof KanbanTaskStatus.Type;
 export const KanbanRunRole = Schema.Literals(["worker", "reviewer"]);
 export type KanbanRunRole = typeof KanbanRunRole.Type;
 
-export const KanbanRunStatus = Schema.Literals([
-  "queued",
-  "running",
-  "completed",
-  "failed",
-  "interrupted",
-]);
+export const KanbanRunStatus = Schema.Literals(["running", "completed", "failed", "interrupted"]);
 export type KanbanRunStatus = typeof KanbanRunStatus.Type;
+
+export const KanbanRunTerminalStatus = Schema.Literals(["completed", "failed", "interrupted"]);
+export type KanbanRunTerminalStatus = typeof KanbanRunTerminalStatus.Type;
 
 export const KanbanReviewOutcome = Schema.Literals([
   "approved",
@@ -71,8 +68,12 @@ export const KanbanReviewOutcome = Schema.Literals([
 ]);
 export type KanbanReviewOutcome = typeof KanbanReviewOutcome.Type;
 
-const NullableThreadId = Schema.optional(Schema.NullOr(ThreadId));
-const NullableTrimmedString = Schema.optional(Schema.NullOr(TrimmedNonEmptyString));
+const NullableThreadId = Schema.optional(Schema.NullOr(ThreadId)).pipe(
+  Schema.withDecodingDefault(() => null),
+);
+const NullableTrimmedString = Schema.optional(Schema.NullOr(TrimmedNonEmptyString)).pipe(
+  Schema.withDecodingDefault(() => null),
+);
 
 export const KanbanBoard = Schema.Struct({
   id: KanbanBoardId,
@@ -170,6 +171,24 @@ export const KanbanBoardSnapshot = Schema.Struct({
 });
 export type KanbanBoardSnapshot = typeof KanbanBoardSnapshot.Type;
 
+export const KanbanGetSnapshotInput = Schema.Struct({
+  boardId: KanbanBoardId,
+});
+export type KanbanGetSnapshotInput = typeof KanbanGetSnapshotInput.Type;
+
+export const KanbanDispatchCommandResult = Schema.Struct({
+  sequence: NonNegativeInt,
+});
+export type KanbanDispatchCommandResult = typeof KanbanDispatchCommandResult.Type;
+
+export const KanbanSubscribeBoardInput = Schema.Struct({
+  boardId: KanbanBoardId,
+});
+export type KanbanSubscribeBoardInput = typeof KanbanSubscribeBoardInput.Type;
+
+export const KanbanUnsubscribeBoardInput = KanbanSubscribeBoardInput;
+export type KanbanUnsubscribeBoardInput = typeof KanbanUnsubscribeBoardInput.Type;
+
 export const KanbanCreateTaskInput = Schema.Struct({
   taskId: KanbanTaskId,
   title: TrimmedNonEmptyString,
@@ -259,7 +278,7 @@ export const KanbanInternalCommand = Schema.Union([
     commandId: CommandId,
     runId: KanbanRunId,
     cardId: KanbanCardId,
-    status: KanbanRunStatus,
+    status: KanbanRunTerminalStatus,
     errorMessage: Schema.optional(TrimmedNonEmptyString),
     completedAt: IsoDateTime,
   }),
@@ -286,12 +305,6 @@ export const KanbanInternalCommand = Schema.Union([
     commandId: CommandId,
     cardId: KanbanCardId,
     readyAt: IsoDateTime,
-  }),
-  Schema.Struct({
-    type: Schema.Literal("kanban.card.submit"),
-    commandId: CommandId,
-    cardId: KanbanCardId,
-    submittedAt: IsoDateTime,
   }),
 ]);
 export type KanbanInternalCommand = typeof KanbanInternalCommand.Type;
@@ -412,3 +425,22 @@ export const KanbanEvent = Schema.Union([
   }),
 ]);
 export type KanbanEvent = typeof KanbanEvent.Type;
+
+export const KanbanRpcSchemas = {
+  getSnapshot: {
+    input: KanbanGetSnapshotInput,
+    output: KanbanBoardSnapshot,
+  },
+  dispatchCommand: {
+    input: KanbanCommand,
+    output: KanbanDispatchCommandResult,
+  },
+  subscribeBoard: {
+    input: KanbanSubscribeBoardInput,
+    output: Schema.Void,
+  },
+  unsubscribeBoard: {
+    input: KanbanUnsubscribeBoardInput,
+    output: Schema.Void,
+  },
+} as const;

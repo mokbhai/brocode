@@ -8,12 +8,21 @@ import {
   KanbanBoardSnapshot,
   KanbanCard,
   KanbanCommand,
+  KanbanDispatchCommandResult,
   KanbanEvent,
+  KanbanGetSnapshotInput,
   KanbanReadModel,
+  KanbanRpcSchemas,
+  KanbanSubscribeBoardInput,
+  KanbanUnsubscribeBoardInput,
 } from "./kanban";
 
 const decodeKanbanCard = Schema.decodeUnknownEffect(KanbanCard);
 const decodeKanbanCommand = Schema.decodeUnknownEffect(KanbanCommand);
+const decodeKanbanGetSnapshotInput = Schema.decodeUnknownEffect(KanbanGetSnapshotInput);
+const decodeKanbanDispatchCommandResult = Schema.decodeUnknownEffect(KanbanDispatchCommandResult);
+const decodeKanbanSubscribeBoardInput = Schema.decodeUnknownEffect(KanbanSubscribeBoardInput);
+const decodeKanbanUnsubscribeBoardInput = Schema.decodeUnknownEffect(KanbanUnsubscribeBoardInput);
 const decodeKanbanEvent = Schema.decodeUnknownEffect(KanbanEvent);
 const decodeKanbanReadModel = Schema.decodeUnknownEffect(KanbanReadModel);
 const decodeKanbanBoardSnapshot = Schema.decodeUnknownEffect(KanbanBoardSnapshot);
@@ -80,12 +89,64 @@ it.effect("decodes a card without worker and reviewer thread links as empty arra
   }),
 );
 
+it.effect("decodes omitted nullable card links as null", () =>
+  Effect.gen(function* () {
+    const {
+      sourceThreadId: _sourceThreadId,
+      associatedWorktreePath: _associatedWorktreePath,
+      associatedWorktreeBranch: _associatedWorktreeBranch,
+      associatedWorktreeRef: _associatedWorktreeRef,
+      ...card
+    } = baseCard;
+
+    const parsed = yield* decodeKanbanCard(card);
+
+    assert.strictEqual(parsed.sourceThreadId, null);
+    assert.strictEqual(parsed.associatedWorktreePath, null);
+    assert.strictEqual(parsed.associatedWorktreeBranch, null);
+    assert.strictEqual(parsed.associatedWorktreeRef, null);
+    assert.strictEqual(parsed.blockerReason, null);
+  }),
+);
+
 it.effect("rejects unknown card status", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
       decodeKanbanCard({
         ...baseCard,
         status: "almost_done",
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
+it.effect("rejects submit commands during Phase 1", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decodeKanbanCommand({
+        type: "kanban.card.submit",
+        commandId: "cmd-submit",
+        cardId: "card-1",
+        submittedAt: createdAt,
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
+it.effect("rejects non-terminal run completion statuses", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decodeKanbanCommand({
+        type: "kanban.run.complete",
+        commandId: "cmd-run-complete",
+        runId: "run-1",
+        cardId: "card-1",
+        status: "running",
+        completedAt: createdAt,
       }),
     );
 
@@ -202,3 +263,35 @@ it("exports Kanban websocket method and channel names", () => {
     boardEvent: "kanban.boardEvent",
   });
 });
+
+it.effect("decodes Kanban RPC schemas keyed by websocket methods", () =>
+  Effect.gen(function* () {
+    const snapshotInput = yield* decodeKanbanGetSnapshotInput({
+      boardId: "board-1",
+    });
+    assert.strictEqual(snapshotInput.boardId, "board-1");
+
+    const receipt = yield* decodeKanbanDispatchCommandResult({
+      sequence: 1,
+    });
+    assert.strictEqual(receipt.sequence, 1);
+
+    const subscribeInput = yield* decodeKanbanSubscribeBoardInput({
+      boardId: "board-1",
+    });
+    assert.strictEqual(subscribeInput.boardId, "board-1");
+
+    const unsubscribeInput = yield* decodeKanbanUnsubscribeBoardInput({
+      boardId: "board-1",
+    });
+    assert.strictEqual(unsubscribeInput.boardId, "board-1");
+
+    assert.strictEqual(KanbanRpcSchemas.getSnapshot.input, KanbanGetSnapshotInput);
+    assert.strictEqual(KanbanRpcSchemas.getSnapshot.output, KanbanBoardSnapshot);
+    assert.strictEqual(KanbanRpcSchemas.dispatchCommand.input, KanbanCommand);
+    assert.strictEqual(KanbanRpcSchemas.dispatchCommand.output, KanbanDispatchCommandResult);
+    assert.strictEqual(KanbanRpcSchemas.subscribeBoard.input, KanbanSubscribeBoardInput);
+    assert.strictEqual(KanbanRpcSchemas.unsubscribeBoard.input, KanbanUnsubscribeBoardInput);
+    assert.deepStrictEqual(Object.keys(KanbanRpcSchemas), Object.keys(KANBAN_WS_METHODS));
+  }),
+);
