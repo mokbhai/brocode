@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { SqlitePersistenceMemory } from "../../persistence/Layers/Sqlite.ts";
 import { KanbanEngineLive } from "./KanbanEngine.ts";
 import { KanbanEventStoreLive } from "./KanbanEventStore.ts";
+import { KanbanProjectionPipelineLive } from "./KanbanProjectionPipeline.ts";
 import { KanbanEngineService } from "../Services/KanbanEngine.ts";
 
 const projectId = ProjectId.makeUnsafe("project-kanban-engine");
@@ -22,10 +23,11 @@ const cardId = KanbanCardId.makeUnsafe("card-kanban-engine");
 const taskId = KanbanTaskId.makeUnsafe("task-kanban-engine");
 
 async function createKanbanSystem() {
-  const layer = KanbanEngineLive.pipe(
-    Layer.provide(KanbanEventStoreLive),
-    Layer.provideMerge(SqlitePersistenceMemory),
+  const projectionLayer = KanbanProjectionPipelineLive.pipe(Layer.provide(KanbanEventStoreLive));
+  const kanbanLayer = KanbanEngineLive.pipe(
+    Layer.provide(Layer.mergeAll(KanbanEventStoreLive, projectionLayer)),
   );
+  const layer = kanbanLayer.pipe(Layer.provideMerge(SqlitePersistenceMemory));
   const runtime = ManagedRuntime.make(layer);
   const engine = await runtime.runPromise(Effect.service(KanbanEngineService));
   const sql = await runtime.runPromise(Effect.service(SqlClient.SqlClient));
@@ -160,6 +162,26 @@ describe("KanbanEngine", () => {
     expect(orchestrationEvents).toEqual([{ count: 0 }]);
     expect(kanbanReceipts).toEqual([{ count: 1 }]);
     expect(orchestrationReceipts).toEqual([{ count: 0 }]);
+
+    await system.dispose();
+  });
+
+  it("projects accepted dispatch events into durable Kanban tables before completing", async () => {
+    const system = await createKanbanSystem();
+    const createdAt = "2026-05-12T00:07:00.000Z";
+
+    await system.run(
+      system.engine.dispatch(boardCreate("cmd-kanban-dispatch-projects-board", createdAt)),
+    );
+
+    const boards = await system.run(
+      system.sql<{ readonly boardId: string; readonly title: string }>`
+        SELECT board_id AS "boardId", title
+        FROM projection_kanban_boards
+      `,
+    );
+
+    expect(boards).toEqual([{ boardId, title: "Engine Board" }]);
 
     await system.dispose();
   });

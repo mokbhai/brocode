@@ -19,6 +19,7 @@ import {
   type KanbanDispatchError,
   type KanbanEngineShape,
 } from "../Services/KanbanEngine.ts";
+import { KanbanProjectionPipeline } from "../Services/KanbanProjectionPipeline.ts";
 
 interface CommandEnvelope {
   readonly command: KanbanCommand;
@@ -50,6 +51,7 @@ function commandToAggregateRef(command: KanbanCommand): {
 const makeKanbanEngine = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const eventStore = yield* KanbanEventStore;
+  const projectionPipeline = yield* KanbanProjectionPipeline;
 
   let readModel = createEmptyKanbanReadModel(new Date().toISOString());
   const commandQueue = yield* Queue.unbounded<CommandEnvelope>();
@@ -155,6 +157,9 @@ const makeKanbanEngine = Effect.gen(function* () {
         );
 
       readModel = committedCommand.nextReadModel;
+      yield* Effect.forEach(committedCommand.committedEvents, projectionPipeline.projectEvent, {
+        concurrency: 1,
+      });
       for (const event of committedCommand.committedEvents) {
         yield* PubSub.publish(eventPubSub, event);
       }
@@ -181,6 +186,8 @@ const makeKanbanEngine = Effect.gen(function* () {
         );
       }),
     );
+
+  yield* projectionPipeline.bootstrap;
 
   yield* Stream.runForEach(eventStore.readAll(), (event) =>
     Effect.gen(function* () {

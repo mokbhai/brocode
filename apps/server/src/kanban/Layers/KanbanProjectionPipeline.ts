@@ -1,8 +1,8 @@
 import type { KanbanCard, KanbanEvent, KanbanRun } from "@t3tools/contracts";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Semaphore, Stream } from "effect";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import { toPersistenceSqlError } from "../../persistence/Errors.ts";
+import { PersistenceSqlError, toPersistenceSqlError } from "../../persistence/Errors.ts";
 import { KanbanEventStore } from "../Services/KanbanEventStore.ts";
 import {
   KanbanProjectionPipeline,
@@ -22,6 +22,7 @@ function nullable<T>(value: T | undefined): T | null {
 const makeKanbanProjectionPipeline = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const eventStore = yield* KanbanEventStore;
+  const projectionSemaphore = yield* Semaphore.make(1);
 
   const readCursor = sql<{ readonly lastAppliedSequence: number }>`
     SELECT last_applied_sequence AS "lastAppliedSequence"
@@ -362,16 +363,24 @@ const makeKanbanProjectionPipeline = Effect.gen(function* () {
   };
 
   const projectEvent: KanbanProjectionPipelineShape["projectEvent"] = (event) =>
-    sql
-      .withTransaction(
-        Effect.gen(function* () {
-          const cursor = yield* readCursor;
-          if (event.sequence <= cursor) {
-            return;
-          }
-          yield* applyEvent(event);
-          yield* advanceCursor(event);
-        }),
+    projectionSemaphore
+      .withPermits(1)(
+        sql.withTransaction(
+          Effect.gen(function* () {
+            const cursor = yield* readCursor;
+            if (event.sequence <= cursor) {
+              return;
+            }
+            if (event.sequence !== cursor + 1) {
+              return yield* new PersistenceSqlError({
+                operation: "KanbanProjectionPipeline.projectEvent:sequence",
+                detail: `Cannot project sequence ${event.sequence}; expected ${cursor + 1}.`,
+              });
+            }
+            yield* applyEvent(event);
+            yield* advanceCursor(event);
+          }),
+        ),
       )
       .pipe(
         Effect.catchTag("SqlError", (sqlError) =>

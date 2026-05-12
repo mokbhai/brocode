@@ -253,6 +253,81 @@ describe("KanbanProjectionPipeline", () => {
     await system.dispose();
   });
 
+  it("refuses non-contiguous projection so callers cannot skip earlier events", async () => {
+    const system = await createProjectionSystem();
+    const createdAt = "2026-05-12T00:04:00.000Z";
+    const firstBoardId = KanbanBoardId.makeUnsafe("board-contiguous-first");
+    const secondBoardId = KanbanBoardId.makeUnsafe("board-contiguous-second");
+
+    const firstEvent = await system.run(
+      system.eventStore.append({
+        ...eventBase({
+          eventId: "evt-kanban-contiguous-first",
+          aggregateKind: "board",
+          aggregateId: firstBoardId,
+          commandId: "cmd-kanban-contiguous-first",
+          occurredAt: createdAt,
+        }),
+        type: "kanban.board.created",
+        payload: {
+          board: {
+            id: firstBoardId,
+            projectId,
+            title: "Contiguous First Board",
+            createdAt,
+            updatedAt: createdAt,
+          },
+        },
+      }),
+    );
+    const secondEvent = await system.run(
+      system.eventStore.append({
+        ...eventBase({
+          eventId: "evt-kanban-contiguous-second",
+          aggregateKind: "board",
+          aggregateId: secondBoardId,
+          commandId: "cmd-kanban-contiguous-second",
+          occurredAt: createdAt,
+        }),
+        type: "kanban.board.created",
+        payload: {
+          board: {
+            id: secondBoardId,
+            projectId,
+            title: "Contiguous Second Board",
+            createdAt,
+            updatedAt: createdAt,
+          },
+        },
+      }),
+    );
+
+    const skippedExit = await system.run(Effect.exit(system.pipeline.projectEvent(secondEvent)));
+    expect(skippedExit._tag).toBe("Failure");
+
+    const rowsAfterSkip = await system.run(
+      system.sql<{ readonly boardId: string }>`
+        SELECT board_id AS "boardId"
+        FROM projection_kanban_boards
+      `,
+    );
+    expect(rowsAfterSkip).toEqual([]);
+
+    await system.run(system.pipeline.projectEvent(firstEvent));
+    await system.run(system.pipeline.projectEvent(secondEvent));
+
+    const projectedBoards = await system.run(
+      system.sql<{ readonly boardId: string }>`
+        SELECT board_id AS "boardId"
+        FROM projection_kanban_boards
+        ORDER BY board_id ASC
+      `,
+    );
+    expect(projectedBoards).toEqual([{ boardId: firstBoardId }, { boardId: secondBoardId }]);
+
+    await system.dispose();
+  });
+
   it("keeps tasks with the same task id on different cards as separate rows", async () => {
     const system = await createProjectionSystem();
     const createdAt = "2026-05-12T00:05:00.000Z";

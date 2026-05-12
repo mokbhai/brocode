@@ -5,6 +5,7 @@ import type { Effect, Stream } from "effect";
 import type {
   OrchestrationCommandReceiptRepositoryError,
   OrchestrationEventStoreError,
+  ProjectionRepositoryError,
 } from "../../persistence/Errors.ts";
 import type { KanbanCommandInvariantError } from "../decider.ts";
 import type { KanbanProjectorDecodeError } from "../projector.ts";
@@ -40,7 +41,8 @@ export type KanbanDispatchError =
   | KanbanCommandInternalError
   | KanbanProjectorDecodeError
   | OrchestrationCommandReceiptRepositoryError
-  | OrchestrationEventStoreError;
+  | OrchestrationEventStoreError
+  | ProjectionRepositoryError;
 
 export interface KanbanEngineShape {
   readonly getReadModel: () => Effect.Effect<KanbanReadModel>;
