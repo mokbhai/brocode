@@ -48,7 +48,7 @@ export const KanbanCardStatus = Schema.Literals([
 ]);
 export type KanbanCardStatus = typeof KanbanCardStatus.Type;
 
-export const KanbanClientSettableCardStatus = Schema.Literals(["draft", "ready", "blocked"]);
+export const KanbanClientSettableCardStatus = Schema.Literals(["draft", "ready"]);
 export type KanbanClientSettableCardStatus = typeof KanbanClientSettableCardStatus.Type;
 
 export const KanbanTaskStatus = Schema.Literals(["todo", "in_progress", "done", "blocked"]);
@@ -280,6 +280,8 @@ export const KanbanClientCommand = Schema.Union([
   }),
 ]);
 export type KanbanClientCommand = typeof KanbanClientCommand.Type;
+export const ClientKanbanCommand = KanbanClientCommand;
+export type ClientKanbanCommand = typeof ClientKanbanCommand.Type;
 
 export const KanbanInternalCommand = Schema.Union([
   Schema.Struct({
@@ -450,7 +452,7 @@ export const KanbanRpcSchemas = {
     output: KanbanBoardSnapshot,
   },
   dispatchCommand: {
-    input: KanbanClientCommand,
+    input: ClientKanbanCommand,
     output: KanbanDispatchCommandResult,
   },
   subscribeBoard: {

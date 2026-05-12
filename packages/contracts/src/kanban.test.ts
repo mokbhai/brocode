@@ -5,6 +5,7 @@ import { Effect, Schema } from "effect";
 import {
   KANBAN_WS_CHANNELS,
   KANBAN_WS_METHODS,
+  ClientKanbanCommand,
   KanbanBoardSnapshot,
   KanbanCard,
   KanbanClientCommand,
@@ -209,7 +210,7 @@ it.effect("rejects internal commands through the Kanban dispatch RPC schema", ()
 
 it.effect("rejects server-owned card statuses through the Kanban dispatch RPC schema", () =>
   Effect.gen(function* () {
-    const result = yield* Effect.exit(
+    const approvedResult = yield* Effect.exit(
       decodeKanbanRpcDispatchInput({
         type: "kanban.card.status.set",
         commandId: "cmd-approve",
@@ -220,7 +221,20 @@ it.effect("rejects server-owned card statuses through the Kanban dispatch RPC sc
       }),
     );
 
-    assert.strictEqual(result._tag, "Failure");
+    assert.strictEqual(approvedResult._tag, "Failure");
+
+    const blockedResult = yield* Effect.exit(
+      decodeKanbanRpcDispatchInput({
+        type: "kanban.card.status.set",
+        commandId: "cmd-block",
+        cardId: "card-1",
+        status: "blocked",
+        reason: "Waiting on user",
+        updatedAt: createdAt,
+      }),
+    );
+
+    assert.strictEqual(blockedResult._tag, "Failure");
   }),
 );
 
@@ -390,7 +404,8 @@ it.effect("decodes Kanban RPC schemas keyed by websocket methods", () =>
 
     assert.strictEqual(KanbanRpcSchemas.getSnapshot.input, KanbanGetSnapshotInput);
     assert.strictEqual(KanbanRpcSchemas.getSnapshot.output, KanbanBoardSnapshot);
-    assert.strictEqual(KanbanRpcSchemas.dispatchCommand.input, KanbanClientCommand);
+    assert.strictEqual(KanbanRpcSchemas.dispatchCommand.input, ClientKanbanCommand);
+    assert.strictEqual(KanbanClientCommand, ClientKanbanCommand);
     assert.strictEqual(KanbanRpcSchemas.dispatchCommand.output, KanbanDispatchCommandResult);
     assert.strictEqual(KanbanRpcSchemas.subscribeBoard.input, KanbanSubscribeBoardInput);
     assert.strictEqual(KanbanRpcSchemas.unsubscribeBoard.input, KanbanUnsubscribeBoardInput);
