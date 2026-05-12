@@ -186,6 +186,29 @@ describe("KanbanEngine", () => {
     await system.dispose();
   });
 
+  it("repairs projection gaps before returning an accepted duplicate command", async () => {
+    const system = await createKanbanSystem();
+    const createdAt = "2026-05-12T00:08:00.000Z";
+    const command = boardCreate("cmd-kanban-duplicate-repairs-projection", createdAt);
+
+    const accepted = await system.run(system.engine.dispatch(command));
+    await system.run(system.sql`DELETE FROM projection_kanban_boards`);
+    await system.run(system.sql`DELETE FROM projection_kanban_state`);
+
+    const duplicate = await system.run(system.engine.dispatch(command));
+    expect(duplicate).toEqual(accepted);
+
+    const boards = await system.run(
+      system.sql<{ readonly boardId: string; readonly title: string }>`
+        SELECT board_id AS "boardId", title
+        FROM projection_kanban_boards
+      `,
+    );
+    expect(boards).toEqual([{ boardId, title: "Engine Board" }]);
+
+    await system.dispose();
+  });
+
   it("returns the accepted sequence for duplicate command ids and rejects previously rejected ids", async () => {
     const system = await createKanbanSystem();
     const createdAt = "2026-05-12T00:01:00.000Z";

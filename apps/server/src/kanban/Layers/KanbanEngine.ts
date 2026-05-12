@@ -90,6 +90,7 @@ const makeKanbanEngine = Effect.gen(function* () {
       const existingReceipt = yield* eventStore.getCommandReceipt(envelope.command.commandId);
       if (Option.isSome(existingReceipt)) {
         if (existingReceipt.value.status === "accepted") {
+          yield* projectionPipeline.bootstrap;
           yield* Deferred.succeed(envelope.result, {
             sequence: existingReceipt.value.resultSequence,
           });

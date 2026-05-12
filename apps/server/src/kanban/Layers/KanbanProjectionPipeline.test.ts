@@ -250,6 +250,18 @@ describe("KanbanProjectionPipeline", () => {
     );
     expect(rows).toEqual([{ boardId, lastAppliedSequence: event.sequence }]);
 
+    await system.run(system.pipeline.projectEvent(event));
+
+    const rowsAfterDuplicate = await system.run(
+      system.sql<{ readonly boardId: string; readonly lastAppliedSequence: number }>`
+        SELECT b.board_id AS "boardId", s.last_applied_sequence AS "lastAppliedSequence"
+        FROM projection_kanban_boards b
+        CROSS JOIN projection_kanban_state s
+        WHERE s.projector = 'kanban.projection'
+      `,
+    );
+    expect(rowsAfterDuplicate).toEqual([{ boardId, lastAppliedSequence: event.sequence }]);
+
     await system.dispose();
   });
 
