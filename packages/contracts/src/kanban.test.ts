@@ -7,6 +7,7 @@ import {
   KANBAN_WS_METHODS,
   KanbanBoardSnapshot,
   KanbanCard,
+  KanbanClientCommand,
   KanbanCommand,
   KanbanDispatchCommandResult,
   KanbanEvent,
@@ -19,6 +20,9 @@ import {
 
 const decodeKanbanCard = Schema.decodeUnknownEffect(KanbanCard);
 const decodeKanbanCommand = Schema.decodeUnknownEffect(KanbanCommand);
+const decodeKanbanRpcDispatchInput = Schema.decodeUnknownEffect(
+  KanbanRpcSchemas.dispatchCommand.input,
+);
 const decodeKanbanGetSnapshotInput = Schema.decodeUnknownEffect(KanbanGetSnapshotInput);
 const decodeKanbanDispatchCommandResult = Schema.decodeUnknownEffect(KanbanDispatchCommandResult);
 const decodeKanbanSubscribeBoardInput = Schema.decodeUnknownEffect(KanbanSubscribeBoardInput);
@@ -109,6 +113,37 @@ it.effect("decodes omitted nullable card links as null", () =>
   }),
 );
 
+it.effect("decodes omitted branch and worktree path as null on cards and card create commands", () =>
+  Effect.gen(function* () {
+    const { branch: _branch, worktreePath: _worktreePath, ...card } = baseCard;
+
+    const parsedCard = yield* decodeKanbanCard(card);
+
+    assert.strictEqual(parsedCard.branch, null);
+    assert.strictEqual(parsedCard.worktreePath, null);
+
+    const parsedCommand = yield* decodeKanbanCommand({
+      type: "kanban.card.create",
+      commandId: "cmd-create-without-worktree",
+      boardId: "board-1",
+      cardId: "card-1",
+      projectId: "project-1",
+      title: "Implement task",
+      tasks: [],
+      modelSelection: {
+        provider: "codex",
+        model: "gpt-5.2",
+      },
+      runtimeMode: "approval-required",
+      createdAt,
+    });
+
+    assert.strictEqual(parsedCommand.type, "kanban.card.create");
+    assert.strictEqual(parsedCommand.branch, null);
+    assert.strictEqual(parsedCommand.worktreePath, null);
+  }),
+);
+
 it.effect("rejects unknown card status", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
@@ -147,6 +182,56 @@ it.effect("rejects non-terminal run completion statuses", () =>
         cardId: "card-1",
         status: "running",
         completedAt: createdAt,
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
+it.effect("rejects internal commands through the Kanban dispatch RPC schema", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decodeKanbanRpcDispatchInput({
+        type: "kanban.run.start",
+        commandId: "cmd-run-start",
+        runId: "run-1",
+        cardId: "card-1",
+        role: "worker",
+        threadId: "thread-worker-1",
+        startedAt: createdAt,
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
+it.effect("rejects run-completed events with non-terminal run status", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decodeKanbanEvent({
+        sequence: 1,
+        eventId: "event-run-completed",
+        aggregateKind: "card",
+        aggregateId: "card-1",
+        type: "kanban.run.completed",
+        occurredAt: createdAt,
+        commandId: "cmd-run-complete",
+        causationEventId: null,
+        correlationId: "cmd-run-complete",
+        metadata: {},
+        payload: {
+          run: {
+            id: "run-1",
+            cardId: "card-1",
+            role: "worker",
+            status: "running",
+            threadId: "thread-worker-1",
+            startedAt: createdAt,
+            completedAt: createdAt,
+          },
+        },
       }),
     );
 
@@ -288,7 +373,7 @@ it.effect("decodes Kanban RPC schemas keyed by websocket methods", () =>
 
     assert.strictEqual(KanbanRpcSchemas.getSnapshot.input, KanbanGetSnapshotInput);
     assert.strictEqual(KanbanRpcSchemas.getSnapshot.output, KanbanBoardSnapshot);
-    assert.strictEqual(KanbanRpcSchemas.dispatchCommand.input, KanbanCommand);
+    assert.strictEqual(KanbanRpcSchemas.dispatchCommand.input, KanbanClientCommand);
     assert.strictEqual(KanbanRpcSchemas.dispatchCommand.output, KanbanDispatchCommandResult);
     assert.strictEqual(KanbanRpcSchemas.subscribeBoard.input, KanbanSubscribeBoardInput);
     assert.strictEqual(KanbanRpcSchemas.unsubscribeBoard.input, KanbanUnsubscribeBoardInput);

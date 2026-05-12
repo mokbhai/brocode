@@ -74,6 +74,9 @@ const NullableThreadId = Schema.optional(Schema.NullOr(ThreadId)).pipe(
 const NullableTrimmedString = Schema.optional(Schema.NullOr(TrimmedNonEmptyString)).pipe(
   Schema.withDecodingDefault(() => null),
 );
+const NullableBranchOrWorktree = Schema.optional(Schema.NullOr(TrimmedNonEmptyString)).pipe(
+  Schema.withDecodingDefault(() => null),
+);
 
 export const KanbanBoard = Schema.Struct({
   id: KanbanBoardId,
@@ -101,8 +104,8 @@ export const KanbanCard = Schema.Struct({
   status: KanbanCardStatus,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
-  branch: Schema.NullOr(TrimmedNonEmptyString),
-  worktreePath: Schema.NullOr(TrimmedNonEmptyString),
+  branch: NullableBranchOrWorktree,
+  worktreePath: NullableBranchOrWorktree,
   associatedWorktreePath: NullableTrimmedString,
   associatedWorktreeBranch: NullableTrimmedString,
   associatedWorktreeRef: NullableTrimmedString,
@@ -137,6 +140,18 @@ export const KanbanRun = Schema.Struct({
   errorMessage: Schema.optional(TrimmedNonEmptyString),
 });
 export type KanbanRun = typeof KanbanRun.Type;
+
+export const KanbanCompletedRun = Schema.Struct({
+  id: KanbanRunId,
+  cardId: KanbanCardId,
+  role: KanbanRunRole,
+  status: KanbanRunTerminalStatus,
+  threadId: Schema.optional(ThreadId),
+  startedAt: IsoDateTime,
+  completedAt: IsoDateTime,
+  errorMessage: Schema.optional(TrimmedNonEmptyString),
+});
+export type KanbanCompletedRun = typeof KanbanCompletedRun.Type;
 
 export const KanbanReview = Schema.Struct({
   id: KanbanReviewId,
@@ -220,8 +235,8 @@ export const KanbanClientCommand = Schema.Union([
     tasks: Schema.Array(KanbanCreateTaskInput),
     modelSelection: ModelSelection,
     runtimeMode: RuntimeMode,
-    branch: Schema.NullOr(TrimmedNonEmptyString),
-    worktreePath: Schema.NullOr(TrimmedNonEmptyString),
+    branch: NullableBranchOrWorktree,
+    worktreePath: NullableBranchOrWorktree,
     associatedWorktreePath: NullableTrimmedString,
     associatedWorktreeBranch: NullableTrimmedString,
     associatedWorktreeRef: NullableTrimmedString,
@@ -388,7 +403,7 @@ export const KanbanEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("kanban.run.completed"),
     payload: Schema.Struct({
-      run: KanbanRun,
+      run: KanbanCompletedRun,
     }),
   }),
   Schema.Struct({
@@ -432,7 +447,7 @@ export const KanbanRpcSchemas = {
     output: KanbanBoardSnapshot,
   },
   dispatchCommand: {
-    input: KanbanCommand,
+    input: KanbanClientCommand,
     output: KanbanDispatchCommandResult,
   },
   subscribeBoard: {
