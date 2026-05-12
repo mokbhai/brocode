@@ -1,5 +1,5 @@
 import {
-  type ClientKanbanCommand,
+  ClientKanbanCommand,
   type EventId,
   type KanbanBoard,
   type KanbanBoardId,
@@ -12,6 +12,7 @@ import {
   type ProjectId,
   type ThreadId,
 } from "@t3tools/contracts";
+import { Schema } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -27,6 +28,7 @@ const cardId = "card-1" as KanbanCardId;
 const taskId = "task-1" as KanbanTaskId;
 const projectId = "project-1" as ProjectId;
 const now = "2026-05-12T00:00:00.000Z";
+const decodeClientKanbanCommand = Schema.decodeUnknownSync(ClientKanbanCommand);
 
 function makeBoard(overrides: Partial<KanbanBoard> = {}): KanbanBoard {
   return {
@@ -237,19 +239,27 @@ describe("kanbanStore state", () => {
     );
     const afterDelete = applyKanbanEventToSnapshot(
       afterTask,
-      makeEvent("kanban.task.deleted", {
-        cardId,
-        taskId,
-        deletedAt: "2026-05-12T01:00:00.000Z",
-      }),
+      makeEvent(
+        "kanban.task.deleted",
+        {
+          cardId,
+          taskId,
+          deletedAt: "2026-05-12T01:00:00.000Z",
+        },
+        3,
+      ),
     );
     const afterBlocked = applyKanbanEventToSnapshot(
       afterDelete,
-      makeEvent("kanban.card.blocked", {
-        cardId,
-        reason: "Needs product decision",
-        blockedAt: "2026-05-12T02:00:00.000Z",
-      }),
+      makeEvent(
+        "kanban.card.blocked",
+        {
+          cardId,
+          reason: "Needs product decision",
+          blockedAt: "2026-05-12T02:00:00.000Z",
+        },
+        4,
+      ),
     );
 
     expect(afterTask.tasksByCardId[cardId]?.map((task) => task.id)).toEqual([taskId, newTask.id]);
@@ -275,6 +285,61 @@ describe("kanbanStore state", () => {
     expect(next).toBe(snapshot);
   });
 
+  it("ignores replayed events already covered by the loaded snapshot sequence", () => {
+    const freshCard = makeCard({
+      title: "Fresh snapshot title",
+      updatedAt: "2026-05-12T02:00:00.000Z",
+    });
+    const snapshot = makeSnapshot({
+      snapshotSequence: 5,
+      cards: [freshCard],
+    });
+
+    const next = applyKanbanEventToSnapshot(
+      snapshot,
+      makeEvent(
+        "kanban.card.updated",
+        {
+          card: makeCard({
+            title: "Stale replay title",
+            updatedAt: "2026-05-12T01:00:00.000Z",
+          }),
+        },
+        5,
+      ),
+    );
+
+    expect(next).toBe(snapshot);
+    expect(next.cards[0]?.title).toBe("Fresh snapshot title");
+  });
+
+  it("reference-counts duplicate board subscriptions", async () => {
+    subscribeBoard.mockResolvedValue(undefined);
+    unsubscribeBoard.mockResolvedValue(undefined);
+
+    const unsubscribeFirst = await useKanbanStore.getState().subscribeKanbanBoard(boardId);
+    const unsubscribeSecond = await useKanbanStore.getState().subscribeKanbanBoard(boardId);
+
+    expect(subscribeBoard).toHaveBeenCalledTimes(1);
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(2);
+
+    await unsubscribeFirst();
+    await unsubscribeFirst();
+
+    expect(unsubscribeBoard).not.toHaveBeenCalled();
+    expect(unsubscribeBoardEvent).not.toHaveBeenCalled();
+    expect(useKanbanStore.getState().subscribedBoardIds[boardId]).toBe(true);
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(1);
+
+    await unsubscribeSecond();
+
+    expect(unsubscribeBoard).toHaveBeenCalledTimes(1);
+    expect(unsubscribeBoard).toHaveBeenCalledWith({ boardId });
+    expect(unsubscribeBoardEvent).toHaveBeenCalledTimes(1);
+    expect(useKanbanStore.getState().subscribedBoardIds[boardId]).toBe(false);
+    expect(useKanbanStore.getState().subscriptionCountByBoardId[boardId]).toBe(0);
+  });
+
   it("dispatches create-card and task-upsert commands through the native Kanban API", async () => {
     dispatchCommand.mockResolvedValue({ sequence: 4 });
 
@@ -284,6 +349,7 @@ describe("kanbanStore state", () => {
       projectId,
       sourceThreadId: "thread-1" as ThreadId,
       title: "Implement Kanban UI",
+      specPath: "docs/spec.md",
       tasks: [{ taskId, title: "Create board", status: "todo", order: 0 }],
       modelSelection: { provider: "codex", model: "gpt-5-codex" },
       runtimeMode: "full-access",
@@ -296,7 +362,9 @@ describe("kanbanStore state", () => {
       order: 1,
     });
 
-    const commands = dispatchCommand.mock.calls.map(([command]) => command as ClientKanbanCommand);
+    const commands = dispatchCommand.mock.calls.map(([command]) =>
+      decodeClientKanbanCommand(command),
+    );
     expect(commands[0]).toMatchObject({
       type: "kanban.card.create",
       boardId,
@@ -304,6 +372,7 @@ describe("kanbanStore state", () => {
       projectId,
       title: "Implement Kanban UI",
       sourceThreadId: "thread-1",
+      specPath: "docs/spec.md",
     });
     expect(commands[0]?.type === "kanban.card.create" ? commands[0].tasks : []).toEqual([
       {

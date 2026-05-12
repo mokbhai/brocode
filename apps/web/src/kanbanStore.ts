@@ -58,7 +58,7 @@ export interface CreateKanbanCardInput {
   sourceThreadId?: ThreadId | null;
   title: string;
   description?: string;
-  specPath?: string;
+  specPath: string;
   tasks?: readonly CreateKanbanCardTaskInput[];
   modelSelection: ModelSelection;
   runtimeMode: RuntimeMode;
@@ -83,6 +83,8 @@ export interface KanbanStoreData {
   loadingBoardIds: Record<string, boolean | undefined>;
   errorByBoardId: Record<string, string | undefined>;
   subscribedBoardIds: Record<string, boolean | undefined>;
+  subscriptionCountByBoardId: Record<string, number | undefined>;
+  removeBoardEventListenerByBoardId: Record<string, (() => void) | undefined>;
 }
 
 export interface KanbanStoreState extends KanbanStoreData {
@@ -99,6 +101,8 @@ export function createInitialKanbanStoreState(): KanbanStoreData {
     loadingBoardIds: {},
     errorByBoardId: {},
     subscribedBoardIds: {},
+    subscriptionCountByBoardId: {},
+    removeBoardEventListenerByBoardId: {},
   };
 }
 
@@ -243,6 +247,10 @@ export function applyKanbanEventToSnapshot(
   snapshot: KanbanBoardSnapshot,
   event: KanbanEvent,
 ): KanbanBoardSnapshot {
+  if (event.sequence <= snapshot.snapshotSequence) {
+    return snapshot;
+  }
+
   switch (event.type) {
     case "kanban.board.created":
       return event.payload.board.id === snapshot.board.id
@@ -413,7 +421,7 @@ function createCardCommand(input: CreateKanbanCardInput): ClientKanbanCommand {
     sourceThreadId: input.sourceThreadId ?? null,
     title: input.title,
     ...(input.description ? { description: input.description } : {}),
-    ...(input.specPath ? { specPath: input.specPath } : {}),
+    specPath: input.specPath,
     tasks: (input.tasks ?? []).map((task, index) => ({
       taskId: task.taskId ?? taskId(),
       title: task.title,
@@ -490,6 +498,65 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
   },
   subscribeKanbanBoard: async (boardIdToSubscribe) => {
     const api = ensureNativeApi();
+    const releaseBoardSubscription = async () => {
+      const current = get();
+      const nextCount = Math.max(
+        (current.subscriptionCountByBoardId[boardIdToSubscribe] ?? 1) - 1,
+        0,
+      );
+      if (nextCount > 0) {
+        set((state) => ({
+          subscriptionCountByBoardId: {
+            ...state.subscriptionCountByBoardId,
+            [boardIdToSubscribe]: nextCount,
+          },
+          subscribedBoardIds: {
+            ...state.subscribedBoardIds,
+            [boardIdToSubscribe]: true,
+          },
+        }));
+        return;
+      }
+
+      current.removeBoardEventListenerByBoardId[boardIdToSubscribe]?.();
+      await api.kanban.unsubscribeBoard({ boardId: boardIdToSubscribe });
+      set((state) => ({
+        subscribedBoardIds: {
+          ...state.subscribedBoardIds,
+          [boardIdToSubscribe]: false,
+        },
+        subscriptionCountByBoardId: {
+          ...state.subscriptionCountByBoardId,
+          [boardIdToSubscribe]: 0,
+        },
+        removeBoardEventListenerByBoardId: {
+          ...state.removeBoardEventListenerByBoardId,
+          [boardIdToSubscribe]: undefined,
+        },
+      }));
+    };
+    const currentSubscriptionCount = get().subscriptionCountByBoardId[boardIdToSubscribe] ?? 0;
+    if (currentSubscriptionCount > 0) {
+      set((state) => ({
+        subscriptionCountByBoardId: {
+          ...state.subscriptionCountByBoardId,
+          [boardIdToSubscribe]: currentSubscriptionCount + 1,
+        },
+        subscribedBoardIds: {
+          ...state.subscribedBoardIds,
+          [boardIdToSubscribe]: true,
+        },
+      }));
+      let unsubscribed = false;
+      return async () => {
+        if (unsubscribed) {
+          return;
+        }
+        unsubscribed = true;
+        await releaseBoardSubscription();
+      };
+    }
+
     const removeBoardEventListener = api.kanban.onBoardEvent((event) => {
       get().applyKanbanBoardEvent(event);
     });
@@ -504,17 +571,23 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
         ...state.subscribedBoardIds,
         [boardIdToSubscribe]: true,
       },
+      subscriptionCountByBoardId: {
+        ...state.subscriptionCountByBoardId,
+        [boardIdToSubscribe]: 1,
+      },
+      removeBoardEventListenerByBoardId: {
+        ...state.removeBoardEventListenerByBoardId,
+        [boardIdToSubscribe]: removeBoardEventListener,
+      },
     }));
 
+    let unsubscribed = false;
     return async () => {
-      removeBoardEventListener();
-      await api.kanban.unsubscribeBoard({ boardId: boardIdToSubscribe });
-      set((state) => ({
-        subscribedBoardIds: {
-          ...state.subscribedBoardIds,
-          [boardIdToSubscribe]: false,
-        },
-      }));
+      if (unsubscribed) {
+        return;
+      }
+      unsubscribed = true;
+      await releaseBoardSubscription();
     };
   },
   createKanbanCard: async (input) => {
