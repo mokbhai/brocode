@@ -19,7 +19,14 @@ import { HiMiniArrowsPointingOut } from "react-icons/hi2";
 import { TbExchange, TbLayoutSidebarRight } from "react-icons/tb";
 import type { ThreadPrimarySurface } from "../../types";
 import GitActionsControl from "../GitActionsControl";
-import { ArrowRightIcon, GlobeIcon, PlusIcon, TerminalIcon, XIcon } from "~/lib/icons";
+import {
+  ArrowRightIcon,
+  GlobeIcon,
+  ListTodoIcon,
+  PlusIcon,
+  TerminalIcon,
+  XIcon,
+} from "~/lib/icons";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
@@ -83,6 +90,10 @@ interface ChatHeaderProps {
     label: string;
     onClick: () => void;
   } | null;
+  kanbanAction?: {
+    label: string;
+    onClick: () => void;
+  } | null;
   onRunProjectScript: (script: ProjectScript) => void;
   onAddProjectScript: (input: NewProjectScriptInput) => Promise<void>;
   onUpdateProjectScript: (scriptId: string, input: NewProjectScriptInput) => Promise<void>;
@@ -138,6 +149,7 @@ export const ChatHeader = memo(function ChatHeader({
   isSidechat = false,
   chatLayoutAction = null,
   changeThreadAction = null,
+  kanbanAction = null,
   onRunProjectScript,
   onAddProjectScript,
   onUpdateProjectScript,
@@ -400,6 +412,12 @@ export const ChatHeader = memo(function ChatHeader({
                   <MenuItem onClick={changeThreadAction.onClick}>
                     <TbExchange className="size-3.5 shrink-0" />
                     <span>{changeThreadAction.label}</span>
+                  </MenuItem>
+                ) : null}
+                {kanbanAction ? (
+                  <MenuItem onClick={kanbanAction.onClick}>
+                    <ListTodoIcon className="size-3.5 shrink-0" />
+                    <span>{kanbanAction.label}</span>
                   </MenuItem>
                 ) : null}
                 {activeProjectScripts ? (

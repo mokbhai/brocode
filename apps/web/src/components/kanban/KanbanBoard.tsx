@@ -2,9 +2,10 @@ import type {
   KanbanBoardSnapshot,
   KanbanCard as KanbanCardRecord,
   KanbanCardId,
+  ModelSelection,
   ThreadId,
 } from "@t3tools/contracts";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -21,6 +22,7 @@ import type {
   DeleteKanbanTaskInput,
   UpsertKanbanTaskInput,
 } from "../../kanbanStore";
+import type { KanbanCreateCardMode } from "./kanbanCreateCard.logic";
 
 export interface KanbanBoardProps {
   readonly snapshot: KanbanBoardSnapshot;
@@ -33,6 +35,11 @@ export interface KanbanBoardProps {
   readonly onStartRun?: (card: KanbanCardRecord) => void;
   readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
   readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
+  readonly initialCreateCardOpen?: boolean;
+  readonly initialCreateCardMode?: KanbanCreateCardMode;
+  readonly initialCreateCardSourceThreadId?: ThreadId | null;
+  readonly initialCreateCardTitle?: string;
+  readonly initialCreateCardModelSelection?: ModelSelection | null;
   readonly className?: string;
 }
 
@@ -47,13 +54,27 @@ export function KanbanBoard({
   onStartRun,
   onUpsertTask,
   onDeleteTask,
+  initialCreateCardOpen = false,
+  initialCreateCardMode,
+  initialCreateCardSourceThreadId = null,
+  initialCreateCardTitle,
+  initialCreateCardModelSelection = null,
   className,
 }: KanbanBoardProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const initialCreateDialogOpenedRef = useRef(false);
   const columns = groupKanbanCardsByColumn(snapshot.cards, snapshot.tasksByCardId);
   const selectedCard = selectedCardId
     ? snapshot.cards.find((card) => card.id === selectedCardId) ?? null
     : null;
+
+  useEffect(() => {
+    if (!initialCreateCardOpen || initialCreateDialogOpenedRef.current) {
+      return;
+    }
+    initialCreateDialogOpenedRef.current = true;
+    setCreateDialogOpen(true);
+  }, [initialCreateCardOpen]);
 
   return (
     <div className={cn("flex size-full min-h-0 flex-col bg-background", className)}>
@@ -158,6 +179,10 @@ export function KanbanBoard({
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onCreateCard={onCreateCard}
+          initialMode={initialCreateCardMode}
+          initialSourceThreadId={initialCreateCardSourceThreadId}
+          initialTitle={initialCreateCardTitle}
+          initialModelSelection={initialCreateCardModelSelection}
         />
       ) : null}
     </div>

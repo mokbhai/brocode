@@ -8,7 +8,7 @@ import {
   type RuntimeMode,
   type ThreadId,
 } from "@t3tools/contracts";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -55,6 +55,10 @@ export interface KanbanCreateCardDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onCreateCard: (input: CreateKanbanCardInput) => Promise<void> | void;
+  readonly initialMode?: KanbanCreateCardMode;
+  readonly initialSourceThreadId?: ThreadId | null;
+  readonly initialTitle?: string;
+  readonly initialModelSelection?: ModelSelection | null;
 }
 
 function isProviderKind(value: string): value is ProviderKind {
@@ -88,6 +92,10 @@ export function KanbanCreateCardDialog({
   open,
   onOpenChange,
   onCreateCard,
+  initialMode,
+  initialSourceThreadId = null,
+  initialTitle,
+  initialModelSelection = null,
 }: KanbanCreateCardDialogProps) {
   const defaultModelSelection = useMemo(() => createDefaultKanbanModelSelection(), []);
   const [mode, setMode] = useState<KanbanCreateCardMode>("specPath");
@@ -103,6 +111,14 @@ export function KanbanCreateCardDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const formErrorId = "kanban-create-card-error";
+  const initialSeed = [
+    initialMode ?? "",
+    initialSourceThreadId ?? "",
+    initialTitle ?? "",
+    initialModelSelection?.provider ?? "",
+    initialModelSelection?.model ?? "",
+  ].join("\u0000");
+  const appliedInitialSeedRef = useRef<string | null>(null);
 
   const resetForm = () => {
     setMode("specPath");
@@ -117,6 +133,20 @@ export function KanbanCreateCardDialog({
     setTasksText("");
     setError(null);
   };
+
+  useEffect(() => {
+    if (!open || appliedInitialSeedRef.current === initialSeed) {
+      return;
+    }
+    appliedInitialSeedRef.current = initialSeed;
+    setMode(initialMode ?? (initialSourceThreadId ? "thread" : "specPath"));
+    setTitle(initialTitle?.trim() ?? "");
+    setSourceThreadId(initialSourceThreadId ?? "");
+    if (initialModelSelection) {
+      setProvider(initialModelSelection.provider);
+      setModel(initialModelSelection.model);
+    }
+  }, [initialMode, initialModelSelection, initialSeed, initialSourceThreadId, initialTitle, open]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
