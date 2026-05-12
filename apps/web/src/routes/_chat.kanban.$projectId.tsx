@@ -54,6 +54,8 @@ function KanbanProjectRouteView() {
   const deleteKanbanTask = useKanbanStore((state) => state.deleteKanbanTask);
   const [selectedCardId, setSelectedCardId] = useState<KanbanCard["id"] | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!project) {
@@ -65,6 +67,7 @@ function KanbanProjectRouteView() {
 
     const ensureBoardAndSubscribe = async () => {
       setRouteError(null);
+      setSubscriptionError(null);
       try {
         await loadKanbanSnapshot(boardId);
       } catch (error) {
@@ -88,7 +91,20 @@ function KanbanProjectRouteView() {
       if (disposed) {
         return;
       }
-      unsubscribe = await subscribeKanbanBoard(boardId);
+      let releaseSubscription: () => Promise<void>;
+      try {
+        releaseSubscription = await subscribeKanbanBoard(boardId);
+      } catch (error) {
+        if (!disposed) {
+          setSubscriptionError(kanbanRouteMessage(error));
+        }
+        return;
+      }
+      if (disposed) {
+        void releaseSubscription();
+        return;
+      }
+      unsubscribe = releaseSubscription;
     };
 
     void ensureBoardAndSubscribe().catch((error) => {
@@ -110,6 +126,7 @@ function KanbanProjectRouteView() {
     project?.id,
     project?.name,
     projectId,
+    retryNonce,
     subscribeKanbanBoard,
   ]);
 
@@ -149,7 +166,7 @@ function KanbanProjectRouteView() {
 
   return (
     <KanbanRouteShell>
-      {snapshot ? (
+      {snapshot && !subscriptionError ? (
         <KanbanBoard
           snapshot={snapshot}
           selectedCardId={selectedCardId}
@@ -170,9 +187,27 @@ function KanbanProjectRouteView() {
         <KanbanRouteState
           title={loading ? "Loading Kanban board" : "Preparing Kanban board"}
           description={
-            routeError ?? storeError ?? "Creating or loading the event-backed project board."
+            routeError ??
+            subscriptionError ??
+            storeError ??
+            "Creating or loading the event-backed project board."
           }
-          tone={routeError || storeError ? "error" : "default"}
+          tone={routeError || subscriptionError || storeError ? "error" : "default"}
+          action={
+            subscriptionError ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setRouteError(null);
+                  setSubscriptionError(null);
+                  setRetryNonce((value) => value + 1);
+                }}
+              >
+                Retry
+              </Button>
+            ) : null
+          }
         />
       )}
     </KanbanRouteShell>

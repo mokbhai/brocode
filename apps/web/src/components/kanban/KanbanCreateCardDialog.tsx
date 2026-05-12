@@ -141,12 +141,30 @@ export function KanbanCreateCardDialog({
     appliedInitialSeedRef.current = initialSeed;
     setMode(initialMode ?? (initialSourceThreadId ? "thread" : "specPath"));
     setTitle(initialTitle?.trim() ?? "");
+    setDescription("");
+    setSpecPath("");
+    setInlineSpec("");
     setSourceThreadId(initialSourceThreadId ?? "");
     if (initialModelSelection) {
       setProvider(initialModelSelection.provider);
       setModel(initialModelSelection.model);
+    } else {
+      setProvider(defaultModelSelection.provider);
+      setModel(defaultModelSelection.model);
     }
-  }, [initialMode, initialModelSelection, initialSeed, initialSourceThreadId, initialTitle, open]);
+    setRuntimeMode(DEFAULT_RUNTIME_MODE);
+    setTasksText("");
+    setError(null);
+  }, [
+    defaultModelSelection.model,
+    defaultModelSelection.provider,
+    initialMode,
+    initialModelSelection,
+    initialSeed,
+    initialSourceThreadId,
+    initialTitle,
+    open,
+  ]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
