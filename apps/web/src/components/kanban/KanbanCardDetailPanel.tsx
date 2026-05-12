@@ -437,17 +437,17 @@ export function KanbanCardDetailPanel({
                         </Button>
                       </div>
                     </div>
-                    {taskError ? (
-                      <div
-                        id={taskErrorId}
-                        role="alert"
-                        aria-live="polite"
-                        className="text-xs text-destructive-foreground"
-                      >
-                        {taskError}
-                      </div>
-                    ) : null}
                   </form>
+                ) : null}
+                {taskError ? (
+                  <div
+                    id={taskErrorId}
+                    role="alert"
+                    aria-live="polite"
+                    className="rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive-foreground"
+                  >
+                    {taskError}
+                  </div>
                 ) : null}
                 {tasks.length > 0 ? (
                   <div className="space-y-2">
