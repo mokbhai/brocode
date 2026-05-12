@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use tauri::{AppHandle, Manager, State, Url};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_notification::{NotificationExt, PermissionState};
 
 use crate::backend::BackendState;
 
@@ -11,6 +12,15 @@ use crate::backend::BackendState;
 pub struct SaveFileFilter {
     name: String,
     extensions: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopNotificationInput {
+    title: Option<String>,
+    body: Option<String>,
+    silent: Option<bool>,
+    thread_id: Option<String>,
 }
 
 #[tauri::command]
@@ -99,6 +109,57 @@ pub async fn close_window(app: AppHandle) -> Result<(), String> {
     window.close().map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+pub async fn notifications_is_supported(app: AppHandle) -> Result<bool, String> {
+    let permission = app
+        .notification()
+        .permission_state()
+        .map_err(|error| error.to_string())?;
+    Ok(is_notification_permission_usable(permission))
+}
+
+#[tauri::command]
+pub async fn notifications_show(
+    app: AppHandle,
+    input: Option<DesktopNotificationInput>,
+) -> Result<bool, String> {
+    let Some(input) = input else {
+        return Ok(false);
+    };
+    let Some(title) = input.title.as_deref().and_then(trimmed_non_empty) else {
+        return Ok(false);
+    };
+    let body = input.body.as_deref().and_then(trimmed_non_empty);
+
+    let mut permission = app
+        .notification()
+        .permission_state()
+        .map_err(|error| error.to_string())?;
+    if should_request_notification_permission(permission) {
+        permission = app
+            .notification()
+            .request_permission()
+            .map_err(|error| error.to_string())?;
+    }
+    if permission != PermissionState::Granted {
+        return Ok(false);
+    }
+
+    let mut notification = app.notification().builder().title(title);
+    if input.silent == Some(true) {
+        notification = notification.silent();
+    }
+    if let Some(body) = body {
+        notification = notification.body(body);
+    }
+    if let Some(thread_id) = input.thread_id.as_deref().and_then(trimmed_non_empty) {
+        notification = notification.group(format!("thread:{thread_id}"));
+    }
+
+    notification.show().map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
 fn file_path_to_path_buf(file_path: tauri_plugin_dialog::FilePath) -> Result<PathBuf, String> {
     file_path.into_path().map_err(|error| error.to_string())
 }
@@ -126,6 +187,28 @@ fn non_empty_path(raw_path: &str) -> Option<PathBuf> {
     }
 
     Some(PathBuf::from(raw_path))
+}
+
+fn trimmed_non_empty(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed)
+}
+
+fn is_notification_permission_usable(permission: PermissionState) -> bool {
+    matches!(
+        permission,
+        PermissionState::Granted | PermissionState::Prompt | PermissionState::PromptWithRationale
+    )
+}
+
+fn should_request_notification_permission(permission: PermissionState) -> bool {
+    matches!(
+        permission,
+        PermissionState::Prompt | PermissionState::PromptWithRationale
+    )
 }
 
 #[cfg(test)]
@@ -168,5 +251,44 @@ mod tests {
             super::non_empty_path("/tmp/brocode"),
             Some(PathBuf::from("/tmp/brocode"))
         );
+    }
+
+    #[test]
+    fn notification_permission_supports_prompt_and_granted_states() {
+        assert!(super::is_notification_permission_usable(
+            tauri_plugin_notification::PermissionState::Granted
+        ));
+        assert!(super::is_notification_permission_usable(
+            tauri_plugin_notification::PermissionState::Prompt
+        ));
+        assert!(super::is_notification_permission_usable(
+            tauri_plugin_notification::PermissionState::PromptWithRationale
+        ));
+        assert!(!super::is_notification_permission_usable(
+            tauri_plugin_notification::PermissionState::Denied
+        ));
+    }
+
+    #[test]
+    fn notification_permission_request_only_prompts_when_needed() {
+        assert!(!super::should_request_notification_permission(
+            tauri_plugin_notification::PermissionState::Granted
+        ));
+        assert!(!super::should_request_notification_permission(
+            tauri_plugin_notification::PermissionState::Denied
+        ));
+        assert!(super::should_request_notification_permission(
+            tauri_plugin_notification::PermissionState::Prompt
+        ));
+        assert!(super::should_request_notification_permission(
+            tauri_plugin_notification::PermissionState::PromptWithRationale
+        ));
+    }
+
+    #[test]
+    fn trimmed_non_empty_rejects_empty_notification_text() {
+        assert_eq!(super::trimmed_non_empty(""), None);
+        assert_eq!(super::trimmed_non_empty("  \n"), None);
+        assert_eq!(super::trimmed_non_empty("  Done  "), Some("Done"));
     }
 }

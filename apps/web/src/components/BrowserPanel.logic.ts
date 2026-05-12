@@ -5,6 +5,7 @@
 // Depends on: browser tab metadata and thread-local browser history
 
 import type { BrowserTabState } from "@t3tools/contracts";
+import { isMacPlatform } from "../lib/utils";
 import type { BrowserHistoryEntry } from "../browserStateStore";
 
 const ABOUT_BLANK_URL = "about:blank";
@@ -50,6 +51,37 @@ interface BuildBrowserAddressSuggestionsInput {
 export interface BrowserChromeStatus {
   tone: "default" | "error";
   label: string;
+}
+
+interface BrowserPanelReloadShortcutEvent {
+  type?: string;
+  key: string;
+  code?: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}
+
+export function isBrowserPanelReloadShortcut(
+  event: BrowserPanelReloadShortcutEvent,
+  platform = navigator.platform,
+): boolean {
+  if (event.type !== undefined && event.type !== "keydown") {
+    return false;
+  }
+
+  const key = event.key.toLowerCase();
+  const isReloadKey = key === "r" || event.code === "KeyR";
+  if (!isReloadKey || event.altKey || event.shiftKey) {
+    return false;
+  }
+
+  if (isMacPlatform(platform)) {
+    return event.metaKey && !event.ctrlKey;
+  }
+
+  return event.ctrlKey && !event.metaKey;
 }
 
 // Hides about:blank from the address bar so new tabs behave like real browsers.

@@ -126,8 +126,8 @@ function createDesktopBridge(): DesktopBridge {
     installUpdate: async () => disabledUpdateActionResult(),
     onUpdateState: () => () => {},
     notifications: {
-      isSupported: async () => false,
-      show: async () => false,
+      isSupported: () => invoke<boolean>("notifications_is_supported"),
+      show: (input) => invoke<boolean>("notifications_show", { input }),
     },
     browser: {
       open: async (input: BrowserOpenInput) => emptyBrowserState(input.threadId),

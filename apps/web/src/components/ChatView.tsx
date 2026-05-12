@@ -217,6 +217,7 @@ import {
   projectScriptIdFromCommand,
   setupProjectScript,
 } from "~/projectScripts";
+import { isBrowserPanelReloadShortcut } from "./BrowserPanel.logic";
 import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/utils";
 import { readNativeApi } from "~/nativeApi";
 import {
@@ -4363,6 +4364,10 @@ export default function ChatView({
         terminalWorkspaceTerminalTabActive,
         terminalWorkspaceChatTabActive,
       };
+
+      if (resolvedBrowserOpen && isBrowserPanelReloadShortcut(event)) {
+        return;
+      }
 
       const command = resolveShortcutCommand(event, keybindings, {
         context: shortcutContext,

@@ -44,6 +44,7 @@ import {
   normalizeBrowserAddressInput,
   resolveBrowserChromeStatus,
   resolveBrowserAddressSync,
+  isBrowserPanelReloadShortcut,
   type BrowserAddressSuggestion,
 } from "./BrowserPanel.logic";
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from "./DiffPanelShell";
@@ -372,6 +373,31 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
       return null;
     }
   }, []);
+
+  const reloadActiveTab = useCallback(() => {
+    if (!api || !activeTab) return;
+    void runBrowserAction(() => api.browser.reload({ threadId, tabId: activeTab.id })).then(
+      (state) => {
+        if (state) {
+          upsertThreadState(state);
+        }
+      },
+    );
+  }, [activeTab, api, runBrowserAction, threadId, upsertThreadState]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || !activeTab) return;
+      if (!isBrowserPanelReloadShortcut(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      reloadActiveTab();
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [activeTab, reloadActiveTab]);
 
   useEffect(() => {
     if (!api) {
@@ -916,14 +942,7 @@ export function BrowserPanel({ mode, threadId, onClosePanel }: BrowserPanelProps
             className="size-7 shrink-0"
             disabled={!activeTab}
             onClick={() => {
-              if (!api || !activeTab) return;
-              void runBrowserAction(() =>
-                api.browser.reload({ threadId, tabId: activeTab.id }),
-              ).then((state) => {
-                if (state) {
-                  upsertThreadState(state);
-                }
-              });
+              reloadActiveTab();
             }}
           >
             {loading ? (

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   browserAddressDisplayValue,
   buildBrowserAddressSuggestions,
+  isBrowserPanelReloadShortcut,
   normalizeBrowserAddressInput,
   resolveBrowserChromeStatus,
   resolveBrowserAddressSync,
@@ -166,5 +167,58 @@ describe("resolveBrowserChromeStatus", () => {
       tone: "default",
       label: "Starting browser...",
     });
+  });
+});
+
+describe("isBrowserPanelReloadShortcut", () => {
+  it("matches Cmd+R on macOS", () => {
+    expect(
+      isBrowserPanelReloadShortcut(
+        {
+          type: "keydown",
+          key: "r",
+          code: "KeyR",
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: false,
+        },
+        "MacIntel",
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Ctrl+R outside macOS", () => {
+    expect(
+      isBrowserPanelReloadShortcut(
+        {
+          type: "keydown",
+          key: "r",
+          code: "KeyR",
+          metaKey: false,
+          ctrlKey: true,
+          shiftKey: false,
+          altKey: false,
+        },
+        "Linux",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match modified reload variants", () => {
+    expect(
+      isBrowserPanelReloadShortcut(
+        {
+          type: "keydown",
+          key: "r",
+          code: "KeyR",
+          metaKey: true,
+          ctrlKey: false,
+          shiftKey: true,
+          altKey: false,
+        },
+        "MacIntel",
+      ),
+    ).toBe(false);
   });
 });
