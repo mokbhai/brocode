@@ -29,6 +29,12 @@ import { ensureNativeApi } from "./nativeApi";
 
 export type KanbanCardsByStatus = Record<KanbanCardStatus, KanbanCard[]>;
 
+export interface CreateKanbanBoardInput {
+  boardId: KanbanBoardId;
+  projectId: ProjectId;
+  title: string;
+}
+
 export interface CreateKanbanCardTaskInput {
   taskId?: KanbanTaskId;
   title: string;
@@ -81,6 +87,7 @@ export interface KanbanStoreData {
 export interface KanbanStoreState extends KanbanStoreData {
   loadKanbanSnapshot: (boardId: KanbanBoardId) => Promise<void>;
   subscribeKanbanBoard: (boardId: KanbanBoardId) => Promise<() => Promise<void>>;
+  createKanbanBoard: (input: CreateKanbanBoardInput) => Promise<void>;
   createKanbanCard: (input: CreateKanbanCardInput) => Promise<void>;
   upsertKanbanTask: (input: UpsertKanbanTaskInput) => Promise<void>;
   deleteKanbanTask: (input: DeleteKanbanTaskInput) => Promise<void>;
@@ -404,6 +411,17 @@ export function selectKanbanTasksForCard(
 
 const pendingBoardSubscriptionByBoardId = new Map<string, Promise<void>>();
 
+function createBoardCommand(input: CreateKanbanBoardInput): ClientKanbanCommand {
+  return {
+    type: "kanban.board.create",
+    commandId: commandId(),
+    boardId: input.boardId,
+    projectId: input.projectId,
+    title: input.title,
+    createdAt: nowIso(),
+  };
+}
+
 function createCardCommand(input: CreateKanbanCardInput): ClientKanbanCommand {
   const createdAt = nowIso();
   return {
@@ -627,6 +645,9 @@ export const useKanbanStore = create<KanbanStoreState>()((set, get) => ({
       unsubscribed = true;
       await releaseBoardSubscription();
     };
+  },
+  createKanbanBoard: async (input) => {
+    await ensureNativeApi().kanban.dispatchCommand(createBoardCommand(input));
   },
   createKanbanCard: async (input) => {
     await ensureNativeApi().kanban.dispatchCommand(createCardCommand(input));

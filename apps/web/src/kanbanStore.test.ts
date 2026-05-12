@@ -422,6 +422,11 @@ describe("kanbanStore state", () => {
   it("dispatches create-card and task-upsert commands through the native Kanban API", async () => {
     dispatchCommand.mockResolvedValue({ sequence: 4 });
 
+    await useKanbanStore.getState().createKanbanBoard({
+      boardId,
+      projectId,
+      title: "Project Board",
+    });
     await useKanbanStore.getState().createKanbanCard({
       boardId,
       cardId,
@@ -449,6 +454,12 @@ describe("kanbanStore state", () => {
       decodeClientKanbanCommand(command),
     );
     expect(commands[0]).toMatchObject({
+      type: "kanban.board.create",
+      boardId,
+      projectId,
+      title: "Project Board",
+    });
+    expect(commands[1]).toMatchObject({
       type: "kanban.card.create",
       boardId,
       cardId,
@@ -457,7 +468,7 @@ describe("kanbanStore state", () => {
       sourceThreadId: "thread-1",
       specPath: "docs/spec.md",
     });
-    expect(commands[0]?.type === "kanban.card.create" ? commands[0].tasks : []).toEqual([
+    expect(commands[1]?.type === "kanban.card.create" ? commands[1].tasks : []).toEqual([
       {
         taskId,
         title: "Create board",
@@ -465,7 +476,7 @@ describe("kanbanStore state", () => {
         order: 0,
       },
     ]);
-    expect(commands[1]).toMatchObject({
+    expect(commands[2]).toMatchObject({
       type: "kanban.task.upsert",
       cardId,
       task: {
@@ -475,7 +486,7 @@ describe("kanbanStore state", () => {
         order: 1,
       },
     });
-    expect(commands[2]).toMatchObject({
+    expect(commands[3]).toMatchObject({
       type: "kanban.task.delete",
       cardId,
       taskId,
