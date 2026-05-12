@@ -2,6 +2,12 @@ import { Schema, Struct } from "effect";
 import { NonNegativeInt, ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas";
 
 import {
+  KANBAN_WS_CHANNELS,
+  KANBAN_WS_METHODS,
+  KanbanEvent,
+  KanbanRpcSchemas,
+} from "./kanban";
+import {
   ClientOrchestrationCommand,
   OrchestrationEvent,
   OrchestrationImportThreadInput,
@@ -186,6 +192,15 @@ const tagRequestBody = <const Tag extends string, const Fields extends Schema.St
   );
 
 const WebSocketRequestBody = Schema.Union([
+  // Kanban methods
+  tagRequestBody(KANBAN_WS_METHODS.getSnapshot, KanbanRpcSchemas.getSnapshot.input),
+  tagRequestBody(
+    KANBAN_WS_METHODS.dispatchCommand,
+    Schema.Struct({ command: KanbanRpcSchemas.dispatchCommand.input }),
+  ),
+  tagRequestBody(KANBAN_WS_METHODS.subscribeBoard, KanbanRpcSchemas.subscribeBoard.input),
+  tagRequestBody(KANBAN_WS_METHODS.unsubscribeBoard, KanbanRpcSchemas.unsubscribeBoard.input),
+
   // Orchestration methods
   tagRequestBody(
     ORCHESTRATION_WS_METHODS.dispatchCommand,
@@ -308,6 +323,7 @@ export interface WsPushPayloadByChannel {
   readonly [ORCHESTRATION_WS_CHANNELS.domainEvent]: OrchestrationEvent;
   readonly [ORCHESTRATION_WS_CHANNELS.shellEvent]: OrchestrationShellStreamItem;
   readonly [ORCHESTRATION_WS_CHANNELS.threadEvent]: OrchestrationThreadStreamItem;
+  readonly [KANBAN_WS_CHANNELS.boardEvent]: KanbanEvent;
 }
 
 export type WsPushChannel = keyof WsPushPayloadByChannel;
@@ -358,6 +374,10 @@ export const WsPushOrchestrationThreadEvent = makeWsPushSchema(
   ORCHESTRATION_WS_CHANNELS.threadEvent,
   OrchestrationThreadStreamItem,
 );
+export const WsPushKanbanBoardEvent = makeWsPushSchema(
+  KANBAN_WS_CHANNELS.boardEvent,
+  KanbanEvent,
+);
 
 export const WsPushChannelSchema = Schema.Literals([
   WS_CHANNELS.gitActionProgress,
@@ -370,6 +390,7 @@ export const WsPushChannelSchema = Schema.Literals([
   ORCHESTRATION_WS_CHANNELS.domainEvent,
   ORCHESTRATION_WS_CHANNELS.shellEvent,
   ORCHESTRATION_WS_CHANNELS.threadEvent,
+  KANBAN_WS_CHANNELS.boardEvent,
 ]);
 export type WsPushChannelSchema = typeof WsPushChannelSchema.Type;
 
@@ -384,6 +405,7 @@ export const WsPush = Schema.Union([
   WsPushOrchestrationDomainEvent,
   WsPushOrchestrationShellEvent,
   WsPushOrchestrationThreadEvent,
+  WsPushKanbanBoardEvent,
 ]);
 export type WsPush = typeof WsPush.Type;
 

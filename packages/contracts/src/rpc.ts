@@ -38,6 +38,7 @@ import {
   GitSummarizeDiffResult,
 } from "./git";
 import { KeybindingRule } from "./keybindings";
+import { KANBAN_WS_METHODS, KanbanEvent, KanbanRpcSchemas } from "./kanban";
 import {
   ClientOrchestrationCommand,
   ORCHESTRATION_WS_METHODS,
@@ -212,6 +213,31 @@ export const WsOrchestrationUnsubscribeThreadRpc = Rpc.make(
     error: WsRpcError,
   },
 );
+
+export const WsKanbanGetSnapshotRpc = Rpc.make(KANBAN_WS_METHODS.getSnapshot, {
+  payload: KanbanRpcSchemas.getSnapshot.input,
+  success: KanbanRpcSchemas.getSnapshot.output,
+  error: WsRpcError,
+});
+
+export const WsKanbanDispatchCommandRpc = Rpc.make(KANBAN_WS_METHODS.dispatchCommand, {
+  payload: KanbanRpcSchemas.dispatchCommand.input,
+  success: KanbanRpcSchemas.dispatchCommand.output,
+  error: WsRpcError,
+});
+
+export const WsKanbanSubscribeBoardRpc = Rpc.make(KANBAN_WS_METHODS.subscribeBoard, {
+  payload: KanbanRpcSchemas.subscribeBoard.input,
+  success: KanbanEvent,
+  error: WsRpcError,
+  stream: true,
+});
+
+export const WsKanbanUnsubscribeBoardRpc = Rpc.make(KANBAN_WS_METHODS.unsubscribeBoard, {
+  payload: KanbanRpcSchemas.unsubscribeBoard.input,
+  success: KanbanRpcSchemas.unsubscribeBoard.output,
+  error: WsRpcError,
+});
 
 export const WsProjectsListDirectoriesRpc = Rpc.make(WS_METHODS.projectsListDirectories, {
   payload: ProjectListDirectoriesInput,
@@ -575,6 +601,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationSubscribeThreadRpc,
   WsOrchestrationUnsubscribeThreadRpc,
   WsOrchestrationSubscribeDomainEventsRpc,
+  WsKanbanGetSnapshotRpc,
+  WsKanbanDispatchCommandRpc,
+  WsKanbanSubscribeBoardRpc,
+  WsKanbanUnsubscribeBoardRpc,
   WsProjectsListDirectoriesRpc,
   WsProjectsSearchEntriesRpc,
   WsProjectsSearchLocalEntriesRpc,

@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
+import { KANBAN_WS_METHODS } from "./kanban";
 import { ORCHESTRATION_WS_CHANNELS, ORCHESTRATION_WS_METHODS } from "./orchestration";
 import { WebSocketRequest, WsResponse, WS_CHANNELS, WS_METHODS } from "./ws";
 
@@ -77,6 +78,20 @@ it.effect("accepts git.preparePullRequestThread requests", () =>
       },
     });
     assert.strictEqual(parsed.body._tag, WS_METHODS.gitPreparePullRequestThread);
+  }),
+);
+
+it.effect("accepts kanban.getSnapshot requests", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decode(WebSocketRequest, {
+      id: "1",
+      body: {
+        _tag: KANBAN_WS_METHODS.getSnapshot,
+        boardId: "board_1",
+      },
+    });
+
+    assert.strictEqual(parsed.body._tag, KANBAN_WS_METHODS.getSnapshot);
   }),
 );
 
