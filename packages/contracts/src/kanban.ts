@@ -48,6 +48,9 @@ export const KanbanCardStatus = Schema.Literals([
 ]);
 export type KanbanCardStatus = typeof KanbanCardStatus.Type;
 
+export const KanbanClientSettableCardStatus = Schema.Literals(["draft", "ready", "blocked"]);
+export type KanbanClientSettableCardStatus = typeof KanbanClientSettableCardStatus.Type;
+
 export const KanbanTaskStatus = Schema.Literals(["todo", "in_progress", "done", "blocked"]);
 export type KanbanTaskStatus = typeof KanbanTaskStatus.Type;
 
@@ -257,7 +260,7 @@ export const KanbanClientCommand = Schema.Union([
     type: Schema.Literal("kanban.card.status.set"),
     commandId: CommandId,
     cardId: KanbanCardId,
-    status: KanbanCardStatus,
+    status: KanbanClientSettableCardStatus,
     reason: NullableTrimmedString,
     updatedAt: IsoDateTime,
   }),

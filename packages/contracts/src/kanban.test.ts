@@ -207,6 +207,23 @@ it.effect("rejects internal commands through the Kanban dispatch RPC schema", ()
   }),
 );
 
+it.effect("rejects server-owned card statuses through the Kanban dispatch RPC schema", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decodeKanbanRpcDispatchInput({
+        type: "kanban.card.status.set",
+        commandId: "cmd-approve",
+        cardId: "card-1",
+        status: "approved",
+        reason: "Reviewer approved",
+        updatedAt: createdAt,
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
 it.effect("rejects run-completed events with non-terminal run status", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
