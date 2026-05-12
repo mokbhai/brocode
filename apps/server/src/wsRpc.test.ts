@@ -135,4 +135,36 @@ describe("Kanban WebSocket RPC handlers", () => {
 
     await system.dispose();
   });
+
+  it("streams board history beyond the event store default page size", async () => {
+    const system = await createKanbanRpcSystem();
+
+    await system.run(
+      system.handlers["kanban.dispatchCommand"](boardCreate("cmd-kanban-ws-deep-board")),
+    );
+    for (let index = 0; index < 1_001; index += 1) {
+      await system.run(
+        system.handlers["kanban.dispatchCommand"](
+          boardCreate(
+            `cmd-kanban-ws-deep-other-${index}`,
+            KanbanBoardId.makeUnsafe(`board-kanban-ws-deep-other-${index}`),
+          ),
+        ),
+      );
+    }
+    await system.run(
+      system.handlers["kanban.dispatchCommand"](cardCreate("cmd-kanban-ws-deep-card")),
+    );
+
+    const streamed = await system.run(
+      Stream.runCollect(Stream.take(system.handlers["kanban.subscribeBoard"]({ boardId }), 2)),
+    );
+
+    expect(streamed.map((event) => event.type)).toEqual([
+      "kanban.board.created",
+      "kanban.card.created",
+    ]);
+
+    await system.dispose();
+  });
 });

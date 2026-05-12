@@ -120,15 +120,22 @@ function makeKanbanBoardEventFilter(boardId: string, initialCardIds: ReadonlyArr
   };
 }
 
-function boardHistoryEventStream(input: {
+function durableBoardEventStream(input: {
   readonly boardId: string;
-  readonly snapshotSequence: number;
   readonly initialCardIds: ReadonlyArray<string>;
   readonly kanbanEngine: KanbanEngineShape;
 }) {
-  return input.kanbanEngine.readEvents(0).pipe(
-    Stream.filter((event) => event.sequence <= input.snapshotSequence),
-    Stream.filter(makeKanbanBoardEventFilter(input.boardId, input.initialCardIds)),
+  const shouldInclude = makeKanbanBoardEventFilter(input.boardId, input.initialCardIds);
+  return Stream.paginate(0, (cursor) =>
+    Stream.runCollect(input.kanbanEngine.readEvents(cursor)).pipe(
+      Effect.flatMap((events) => {
+        if (events.length === 0) {
+          return Effect.sleep("100 millis").pipe(Effect.as([[], Option.some(cursor)] as const));
+        }
+        const lastSequence = events[events.length - 1]!.sequence;
+        return Effect.succeed([events.filter(shouldInclude), Option.some(lastSequence)] as const);
+      }),
+    ),
   );
 }
 
@@ -152,21 +159,11 @@ export function makeKanbanWsHandlers(input: {
         input.kanbanSnapshotQuery.getSnapshot(subscribeInput).pipe(
           Effect.map((snapshot) => {
             const initialCardIds = snapshot.cards.map((card) => card.id);
-            const shouldIncludeHot = makeKanbanBoardEventFilter(
-              subscribeInput.boardId,
-              initialCardIds,
-            );
-            const history = boardHistoryEventStream({
+            return durableBoardEventStream({
               boardId: subscribeInput.boardId,
-              snapshotSequence: snapshot.snapshotSequence,
               initialCardIds,
               kanbanEngine: input.kanbanEngine,
             });
-            const hot = input.kanbanEngine.streamDomainEvents.pipe(
-              Stream.filter((event) => event.sequence > snapshot.snapshotSequence),
-              Stream.filter(shouldIncludeHot),
-            );
-            return Stream.concat(history, hot);
           }),
           Effect.mapError((cause) => toWsRpcError(cause, "Failed to subscribe to Kanban board")),
         ),
