@@ -32,6 +32,9 @@ type RpcClientInstance =
   RpcClientEffect extends Effect.Effect<infer Client, any, any> ? Client : never;
 
 type TransportState = "connecting" | "open" | "closed" | "disposed";
+interface StreamRestartOptions {
+  readonly reconnectOnFailure?: boolean;
+}
 
 class WsTransportRpcError extends Data.TaggedError("WsTransportRpcError")<{
   readonly message: string;
@@ -82,6 +85,17 @@ export function shouldKeepServerLifecycleStream(activeChannels: ReadonlySet<stri
     activeChannels.has(WS_CHANNELS.serverWelcome) ||
     activeChannels.has(WS_CHANNELS.serverMaintenanceUpdated)
   );
+}
+
+export function shouldRestartKanbanBoardStream(
+  activeBoardIds: ReadonlySet<string>,
+  boardId: string,
+): boolean {
+  return activeBoardIds.has(boardId);
+}
+
+export function shouldReconnectFailedStream(options?: StreamRestartOptions): boolean {
+  return options?.reconnectOnFailure !== false;
 }
 
 export class WsTransport {
@@ -454,6 +468,9 @@ export class WsTransport {
     this.stopStream(key);
     this.stoppingStreams.delete(key);
     const restartBoard = () => {
+      if (!shouldRestartKanbanBoardStream(new Set(this.boardSubscriptions.keys()), boardId)) {
+        return;
+      }
       void this.getClient()
         .then((nextClient) => this.startBoardStream(nextClient, boardId, input))
         .catch((error) => console.warn("WebSocket RPC board stream failed to restart", error));
@@ -463,6 +480,7 @@ export class WsTransport {
       client[KANBAN_WS_METHODS.subscribeBoard](input as never),
       (event: KanbanEvent) => this.emit(KANBAN_WS_CHANNELS.boardEvent, event),
       restartBoard,
+      { reconnectOnFailure: false },
     );
   }
 
@@ -471,6 +489,7 @@ export class WsTransport {
     stream: unknown,
     listener: (event: T) => void,
     restart?: (() => void) | undefined,
+    options?: StreamRestartOptions,
   ): void {
     if (this.streamCleanups.has(key)) return;
     const runnableStream = stream as Stream.Stream<T, WsTransportRpcError, never>;
@@ -485,7 +504,7 @@ export class WsTransport {
           if (wasStoppedIntentionally || this.disposed) {
             return;
           }
-          if (restart && Exit.isFailure(exit)) {
+          if (restart && Exit.isFailure(exit) && shouldReconnectFailedStream(options)) {
             window.setTimeout(
               () => {
                 if (!this.disposed && !this.streamCleanups.has(key)) {

@@ -6,7 +6,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WS_CHANNELS } from "@t3tools/contracts";
 
-import { shouldKeepServerLifecycleStream, WsTransport } from "./wsTransport";
+import {
+  shouldKeepServerLifecycleStream,
+  shouldReconnectFailedStream,
+  shouldRestartKanbanBoardStream,
+  WsTransport,
+} from "./wsTransport";
 
 type WsEventType = "open" | "message" | "close" | "error";
 type WsListener = (event?: { data?: unknown }) => void;
@@ -88,6 +93,18 @@ describe("WsTransport", () => {
       ),
     ).toBe(true);
     expect(shouldKeepServerLifecycleStream(new Set([WS_CHANNELS.serverConfigUpdated]))).toBe(false);
+  });
+
+  it("restarts kanban board streams only while the board subscription is still active", () => {
+    expect(shouldRestartKanbanBoardStream(new Set(["board-1"]), "board-1")).toBe(true);
+    expect(shouldRestartKanbanBoardStream(new Set(["board-1"]), "board-2")).toBe(false);
+    expect(shouldRestartKanbanBoardStream(new Set(), "board-1")).toBe(false);
+  });
+
+  it("allows individual failing streams to opt out of reconnect", () => {
+    expect(shouldReconnectFailedStream()).toBe(true);
+    expect(shouldReconnectFailedStream({ reconnectOnFailure: true })).toBe(true);
+    expect(shouldReconnectFailedStream({ reconnectOnFailure: false })).toBe(false);
   });
 
   it("normalizes explicit websocket URLs to the RPC endpoint", () => {
