@@ -23,6 +23,7 @@ export interface KanbanBoardProps {
   readonly selectedCardId?: KanbanCardId | null;
   readonly onSelectCard?: (cardId: KanbanCardId | null, card?: KanbanCardRecord) => void;
   readonly onCreateCard?: (snapshot: KanbanBoardSnapshot) => void;
+  readonly onOpenSourceThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onStartRun?: (card: KanbanCardRecord) => void;
@@ -34,6 +35,7 @@ export function KanbanBoard({
   selectedCardId = null,
   onSelectCard,
   onCreateCard,
+  onOpenSourceThread,
   onOpenWorkerThread,
   onOpenReviewerThread,
   onStartRun,
@@ -141,6 +143,7 @@ export function KanbanBoard({
             onSelectCard?.(null);
           }
         }}
+        onOpenSourceThread={onOpenSourceThread}
         onOpenWorkerThread={onOpenWorkerThread}
         onOpenReviewerThread={onOpenReviewerThread}
         onStartRun={onStartRun}

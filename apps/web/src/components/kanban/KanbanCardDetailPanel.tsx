@@ -34,6 +34,7 @@ import {
   ExternalLinkIcon,
   GitForkIcon,
   ListChecksIcon,
+  MessageCircleIcon,
   PlusIcon,
   PlayIcon,
   RefreshCwIcon,
@@ -51,6 +52,7 @@ export interface KanbanCardDetailPanelProps {
   readonly reviews?: readonly KanbanReview[];
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly onOpenSourceThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onOpenWorkerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onStartRun?: (card: KanbanCard) => void;
@@ -132,6 +134,7 @@ export function KanbanCardDetailPanel({
   reviews = [],
   open,
   onOpenChange,
+  onOpenSourceThread,
   onOpenWorkerThread,
   onOpenReviewerThread,
   onStartRun,
@@ -247,6 +250,18 @@ export function KanbanCardDetailPanel({
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2">
+                  {card.sourceThreadId ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!onOpenSourceThread}
+                      onClick={() => onOpenSourceThread?.(card.sourceThreadId as ThreadId, card)}
+                    >
+                      <MessageCircleIcon />
+                      Source thread
+                      <ExternalLinkIcon className="ms-auto" />
+                    </Button>
+                  ) : null}
                   {card.workerThreadIds.length > 0 ? (
                     card.workerThreadIds.map((threadId, index) => (
                       <Button

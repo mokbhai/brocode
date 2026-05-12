@@ -25,6 +25,7 @@ import { KanbanBoard } from "./KanbanBoard";
 const boardId = "board-1" as KanbanBoardId;
 const cardId = "card-1" as KanbanCardId;
 const projectId = "project-1" as ProjectId;
+const sourceThreadId = "thread-source-1" as ThreadId;
 const workerThreadId = "thread-worker-1" as ThreadId;
 const reviewerThreadId = "thread-reviewer-1" as ThreadId;
 const now = "2026-05-12T00:00:00.000Z";
@@ -44,7 +45,7 @@ function makeCard(): KanbanCard {
     id: cardId,
     boardId,
     projectId,
-    sourceThreadId: null,
+    sourceThreadId,
     workerThreadIds: [workerThreadId],
     reviewerThreadIds: [reviewerThreadId],
     title: "Implement board components",
@@ -127,6 +128,7 @@ function makeSnapshot(): KanbanBoardSnapshot {
 
 function KanbanBoardHarness(props: {
   readonly onCreateCard: ReturnType<typeof vi.fn>;
+  readonly onOpenSourceThread: ReturnType<typeof vi.fn>;
   readonly onOpenReviewerThread: ReturnType<typeof vi.fn>;
   readonly onOpenWorkerThread: ReturnType<typeof vi.fn>;
   readonly onStartRun: ReturnType<typeof vi.fn>;
@@ -138,6 +140,7 @@ function KanbanBoardHarness(props: {
       selectedCardId={selectedCardId}
       onSelectCard={(nextCardId) => setSelectedCardId(nextCardId)}
       onCreateCard={props.onCreateCard}
+      onOpenSourceThread={props.onOpenSourceThread}
       onOpenReviewerThread={props.onOpenReviewerThread}
       onOpenWorkerThread={props.onOpenWorkerThread}
       onStartRun={props.onStartRun}
@@ -151,12 +154,14 @@ async function mountBoard() {
   document.body.append(host);
 
   const onCreateCard = vi.fn();
+  const onOpenSourceThread = vi.fn();
   const onOpenReviewerThread = vi.fn();
   const onOpenWorkerThread = vi.fn();
   const onStartRun = vi.fn();
   const screen = await render(
     <KanbanBoardHarness
       onCreateCard={onCreateCard}
+      onOpenSourceThread={onOpenSourceThread}
       onOpenReviewerThread={onOpenReviewerThread}
       onOpenWorkerThread={onOpenWorkerThread}
       onStartRun={onStartRun}
@@ -170,6 +175,7 @@ async function mountBoard() {
       host.remove();
     },
     onCreateCard,
+    onOpenSourceThread,
     onOpenReviewerThread,
     onOpenWorkerThread,
     onStartRun,
@@ -197,10 +203,15 @@ describe("KanbanBoard", () => {
       await expect.element(page.getByRole("heading", { name: "Tasks" })).toBeInTheDocument();
 
       await page.getByRole("button", { name: /Start run/ }).click();
+      await page.getByRole("button", { name: /Source thread/ }).click();
       await page.getByRole("button", { name: /Worker 1/ }).click();
       await page.getByRole("button", { name: /Reviewer 1/ }).click();
 
       expect(mounted.onStartRun).toHaveBeenCalledWith(expect.objectContaining({ id: cardId }));
+      expect(mounted.onOpenSourceThread).toHaveBeenCalledWith(
+        sourceThreadId,
+        expect.objectContaining({ id: cardId }),
+      );
       expect(mounted.onOpenWorkerThread).toHaveBeenCalledWith(
         workerThreadId,
         expect.objectContaining({ id: cardId }),
