@@ -80,14 +80,18 @@ export function shouldNavigateComposerInputHistory(input: {
   expandedCursor: number;
   historyState: ComposerInputHistoryState;
 }): boolean {
-  if (input.historyState.activeIndex !== null) {
-    return true;
-  }
-  if (input.key !== "ArrowUp") {
-    return false;
-  }
   const cursor = Math.max(0, Math.min(input.prompt.length, Math.floor(input.expandedCursor)));
-  return !input.prompt.slice(0, cursor).includes("\n");
+  if (input.key === "ArrowUp") {
+    return cursor === 0;
+  }
+  return input.historyState.activeIndex !== null && cursor === input.prompt.length;
+}
+
+export function shouldResetComposerInputHistoryAfterPromptChange(input: {
+  previousPrompt: string;
+  nextPrompt: string;
+}): boolean {
+  return input.previousPrompt !== input.nextPrompt;
 }
 
 export function resolveComposerInputHistoryNavigation(input: {

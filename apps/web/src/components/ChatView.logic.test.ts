@@ -18,6 +18,7 @@ import {
   shouldAutoDeleteTerminalThreadOnLastClose,
   shouldConsumePendingCustomBinaryConfirmation,
   shouldNavigateComposerInputHistory,
+  shouldResetComposerInputHistoryAfterPromptChange,
   shouldShowComposerModelBootstrapSkeleton,
   shouldStartActiveTurnLayoutGrace,
   shouldRenderTerminalWorkspace,
@@ -252,7 +253,7 @@ describe("composer input history", () => {
     });
   });
 
-  it("leaves normal arrow navigation alone inside multiline drafts until history browsing starts", () => {
+  it("only navigates history from the composer text boundaries", () => {
     expect(
       shouldNavigateComposerInputHistory({
         key: "ArrowUp",
@@ -266,7 +267,7 @@ describe("composer input history", () => {
       shouldNavigateComposerInputHistory({
         key: "ArrowUp",
         prompt: "line one\nline two",
-        expandedCursor: "line".length,
+        expandedCursor: 0,
         historyState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
       }),
     ).toBe(true);
@@ -279,6 +280,46 @@ describe("composer input history", () => {
         historyState: EMPTY_COMPOSER_INPUT_HISTORY_STATE,
       }),
     ).toBe(false);
+
+    expect(
+      shouldNavigateComposerInputHistory({
+        key: "ArrowDown",
+        prompt: "line one",
+        expandedCursor: 4,
+        historyState: {
+          activeIndex: 0,
+          draftBeforeHistory: "",
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldNavigateComposerInputHistory({
+        key: "ArrowDown",
+        prompt: "line one",
+        expandedCursor: "line one".length,
+        historyState: {
+          activeIndex: 0,
+          draftBeforeHistory: "",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps history browsing active when a controlled focus update reports the same prompt", () => {
+    expect(
+      shouldResetComposerInputHistoryAfterPromptChange({
+        previousPrompt: "third",
+        nextPrompt: "third",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldResetComposerInputHistoryAfterPromptChange({
+        previousPrompt: "third",
+        nextPrompt: "third with edit",
+      }),
+    ).toBe(true);
   });
 });
 

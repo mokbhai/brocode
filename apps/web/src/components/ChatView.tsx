@@ -336,6 +336,7 @@ import {
   shouldRenderTerminalWorkspace,
   resolveComposerInputHistoryNavigation,
   shouldNavigateComposerInputHistory,
+  shouldResetComposerInputHistoryAfterPromptChange,
   cloneComposerImageForRetry,
   collectUserMessageBlobPreviewUrls,
   createLocalDispatchSnapshot,
@@ -6629,10 +6630,11 @@ export default function ChatView({
   );
 
   const setComposerInputHistoryPromptValue = useCallback(
-    (nextPrompt: string) => {
+    (nextPrompt: string, key: "ArrowDown" | "ArrowUp") => {
       promptRef.current = nextPrompt;
       setPrompt(nextPrompt);
-      const nextCursor = collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
+      const nextCursor =
+        key === "ArrowUp" ? 0 : collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
       setComposerCursor(nextCursor);
       setComposerTrigger(null);
       setComposerHighlightedItemId(null);
@@ -6901,7 +6903,14 @@ export default function ChatView({
         );
         return;
       }
-      composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
+      if (
+        shouldResetComposerInputHistoryAfterPromptChange({
+          previousPrompt: promptRef.current,
+          nextPrompt,
+        })
+      ) {
+        composerInputHistoryStateRef.current = EMPTY_COMPOSER_INPUT_HISTORY_STATE;
+      }
       promptRef.current = nextPrompt;
       setPrompt(nextPrompt);
       if (composerCommandPicker !== null && nextPrompt.trim().length > 0) {
@@ -7013,7 +7022,7 @@ export default function ChatView({
       });
       if (navigation.handled) {
         composerInputHistoryStateRef.current = navigation.nextState;
-        setComposerInputHistoryPromptValue(navigation.nextPrompt);
+        setComposerInputHistoryPromptValue(navigation.nextPrompt, key);
         return true;
       }
     }
