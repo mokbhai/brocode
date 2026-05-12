@@ -88,8 +88,12 @@ export const KanbanCard = Schema.Struct({
   boardId: KanbanBoardId,
   projectId: ProjectId,
   sourceThreadId: NullableThreadId,
-  workerThreadIds: Schema.Array(ThreadId),
-  reviewerThreadIds: Schema.Array(ThreadId),
+  workerThreadIds: Schema.optional(Schema.Array(ThreadId)).pipe(
+    Schema.withDecodingDefault(() => []),
+  ),
+  reviewerThreadIds: Schema.optional(Schema.Array(ThreadId)).pipe(
+    Schema.withDecodingDefault(() => []),
+  ),
   title: TrimmedNonEmptyString,
   description: Schema.optional(TrimmedNonEmptyString),
   specPath: Schema.optional(TrimmedNonEmptyString),

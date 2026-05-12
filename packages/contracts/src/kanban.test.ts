@@ -68,6 +68,18 @@ it.effect("decodes a card linked to project, source thread, agent threads, and w
   }),
 );
 
+it.effect("decodes a card without worker and reviewer thread links as empty arrays", () =>
+  Effect.gen(function* () {
+    const { workerThreadIds: _workerThreadIds, reviewerThreadIds: _reviewerThreadIds, ...card } =
+      baseCard;
+
+    const parsed = yield* decodeKanbanCard(card);
+
+    assert.deepStrictEqual(parsed.workerThreadIds, []);
+    assert.deepStrictEqual(parsed.reviewerThreadIds, []);
+  }),
+);
+
 it.effect("rejects unknown card status", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
