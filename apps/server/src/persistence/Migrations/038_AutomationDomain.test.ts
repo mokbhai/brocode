@@ -123,9 +123,11 @@ describe("038_AutomationDomain", () => {
         "idx_automation_events_stream_version",
         "idx_automation_events_stream_sequence",
         "idx_automation_events_command_id",
+        "idx_automation_events_correlation_id",
       ]);
       assert.includeMembers(yield* indexNames(sql, "automation_command_receipts"), [
         "idx_automation_command_receipts_aggregate",
+        "idx_automation_command_receipts_sequence",
       ]);
     })),
   );
