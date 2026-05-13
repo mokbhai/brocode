@@ -2,7 +2,7 @@
 
 ## Complete Target
 
-BroCode should add a native Kanban section where a completed planning thread or spec becomes an executable card. A card owns the execution lifecycle: spec reference, checklist, isolated worktree and branch, linked provider threads, worker runs, reviewer runs, retry policy, blocker state, and submission readiness.
+BroCode should add a native Kanban section where a completed planning thread or spec becomes an executable card. A card owns the execution lifecycle: user-provided execution context, model/runtime settings, model-generated checklist, isolated worktree and branch, linked provider threads, worker runs, reviewer runs, retry policy, blocker state, and submission readiness.
 
 The experience should preserve BroCode's current architecture. Kanban orchestration schedules existing provider sessions and turns. It must not introduce a new LLM calling layer, direct model SDK integration, duplicate streaming system, or provider-specific protocol handling. All model execution goes through existing provider abstractions such as `ProviderService`, provider adapters, `ModelSelection`, `ProviderStartOptions`, provider runtime events, and orchestration events.
 
@@ -10,9 +10,9 @@ The first complete version uses one shared isolated worktree and branch per card
 
 ## User Experience
 
-The user plans work in Threads. Once a spec is ready, they create a Kanban card from the current thread, a spec file path, or manual card input. In Kanban, the user reviews or edits the checklist, starts the agent loop, watches progress by card status, opens linked worker/reviewer threads for details, reviews diffs or checkpoints, and approves submission when the reviewer has passed the work.
+The user plans work in Threads. Once a spec is ready, they create a Kanban card with a title, description, runtime mode, provider, and model. The description is the single user-authored context field: the user can paste a spec, paste notes, or include a path to a spec file. Kanban does not expose separate source modes, separate spec-path input, separate inline-spec input, or a manual initial-task list. The first worker run generates the initial to-do list from the card context.
 
-The Kanban board is a peer section beside Threads and Workspace. It is an execution control plane, not another transcript view. The card detail panel shows the spec, checklist, run history, reviewer findings, linked threads, worktree and branch, diff/checkpoint links, and start/stop controls.
+The Kanban board is a peer section beside Threads and Workspace. It is an execution control plane, not another transcript view. The card detail panel shows the description/context, generated checklist, run history, reviewer findings, linked threads, worktree and branch, diff/checkpoint links, and start/stop controls.
 
 ## Required Lifecycle
 
@@ -38,7 +38,7 @@ The normal loop is:
 
 1. Card enters `Ready`.
 2. Worker run starts through existing provider orchestration.
-3. Worker works through card tasks in the card worktree.
+3. Worker generates missing tasks from the card context, then works through card tasks in the card worktree.
 4. Worker completion moves the card to `Reviewing`.
 5. Reviewer run starts through existing provider orchestration.
 6. Reviewer either approves, blocks, or creates concrete follow-up tasks.
@@ -83,4 +83,3 @@ Submission and PR creation are human-gated in the complete target for this spec 
 5. [Submission Gate](./05-submission-gate.md)
 
 Each phase should produce working software and focused tests. The feature is complete when all phases are implemented.
-

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add the Kanban section and allow users to create, inspect, and edit cards before agent execution exists.
+Add the Kanban section and allow users to create and inspect cards before agent execution exists.
 
 ## Scope
 
@@ -21,19 +21,18 @@ Columns:
 Card summary:
 
 - title
-- spec path or source
-- task count and completion count
+- generated task count and completion count when tasks exist
 - current status
 - active role when present
 - retry count when present
 - provider/model selection
+- runtime mode
 - branch/worktree when present
 
 Card detail panel:
 
-- spec reference
-- source thread link
-- editable checklist
+- title and description/context
+- read-only generated checklist when tasks exist
 - run history placeholder
 - reviewer findings placeholder
 - worktree/branch metadata
@@ -41,19 +40,27 @@ Card detail panel:
 
 ## Create Flows
 
-Support:
+Support one create-card flow with these fields only:
 
-- create card from current planning thread
-- create card from spec path
-- create card manually
+- title
+- description
+- runtime mode
+- provider
+- model
 
-The create-from-thread flow should link the card to the source thread. It does not need to extract perfect tasks automatically in this phase; manual task editing is enough.
+The description is the single user-authored context field. The user can paste a full spec, paste planning notes, or type a spec path into the description. Do not add a source selector, separate spec-path input, separate inline-spec input, or manual initial-task input.
+
+Provider and model selection should reuse the same interaction pattern and data shape as Threads. Kanban must not add a provider/model abstraction or a separate LLM-calling path.
+
+If the dialog is opened from a planning thread, it may prefill title/description and retain a hidden `sourceThreadId` for navigation, but the user should still see the same simple form. There should be no user-visible source mode.
 
 ## Acceptance Criteria
 
 - User can open a Kanban section for a project.
-- User can create a card from a thread or spec path.
-- User can edit the checklist before execution.
+- User can create a card with title, description, runtime mode, provider, and model.
+- User can paste spec content or a spec path into the description without choosing a separate source.
+- User is not asked to provide initial tasks during card creation.
+- User cannot manually add, edit, or delete tasks from the Kanban UI.
 - User can change basic card metadata.
 - UI reflects event-backed board updates from the server.
 - Full transcript rendering stays in the existing thread view; Kanban links to thread logs instead of embedding them.
@@ -62,6 +69,7 @@ The create-from-thread flow should link the card to the source thread. It does n
 
 - UI logic tests for board grouping and card status display.
 - UI tests for create-card command payloads.
+- UI tests proving removed fields are not required or submitted: source, spec path, inline spec, and initial tasks.
+- UI tests proving manual task add/edit/delete controls are not rendered.
 - Store/projection application tests for Kanban snapshots and updates.
 - Accessibility checks for card actions and side panel controls.
-

@@ -37,9 +37,12 @@ Add schemas for:
 - optional `sourceThreadId`
 - optional worker thread ids
 - optional reviewer thread ids
+- title and description/context
 - model selection through existing `ModelSelection`
 - runtime mode through existing runtime mode contracts
 - branch/worktree metadata compatible with existing thread/worktree helpers
+
+Public card creation and update commands should not accept branch/worktree metadata. Worktree ownership is server-owned and must be persisted only after server-side preparation.
 
 Recommended event types:
 
@@ -56,6 +59,8 @@ Recommended event types:
 - `kanban.card.approved`
 - `kanban.card.ready-to-submit`
 
+Task mutation commands should be server-owned/internal. The UI can display generated tasks, but public client commands should not let users manually create, edit, or delete card tasks because worker and reviewer agents own task generation.
+
 The event store should not overload thread aggregates for cards. Prefer extending aggregate kinds with Kanban-specific aggregates such as `board` and `card`, unless implementation review shows a sibling Kanban event store is materially safer.
 
 ## Server
@@ -67,9 +72,10 @@ No provider execution happens in this phase.
 ## Acceptance Criteria
 
 - A project can have a default Kanban board.
-- A card with spec reference and tasks can be created and projected.
+- A card with title, description/context, runtime mode, and model selection can be created and projected without user-provided tasks.
 - Card status changes are event-backed and replayable.
-- Task creation, update, and deletion are event-backed and replayable.
+- Server-owned task creation, update, and deletion are event-backed and replayable.
+- Public client commands cannot manually create, update, or delete tasks.
 - Web clients can fetch a Kanban snapshot.
 - Web clients can subscribe to Kanban state updates.
 
