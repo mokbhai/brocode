@@ -3,6 +3,8 @@ import { it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import {
   Automation,
+  AUTOMATION_WS_CHANNELS,
+  AUTOMATION_WS_METHODS,
   AutomationClientCommand,
   AutomationCommand,
   AutomationEvent,
@@ -10,6 +12,7 @@ import {
   AutomationRpcSchemas,
   AutomationSnapshot,
 } from "./automation";
+import { WebSocketRequest, WsResponse } from "./ws";
 
 const now = "2026-05-13T00:00:00.000Z";
 
@@ -87,6 +90,109 @@ it.effect("rejects invalid schedule ranges", () =>
   }),
 );
 
+it.effect("distinguishes omitted update next run from explicit null", () =>
+  Effect.gen(function* () {
+    const omitted = yield* Schema.decodeUnknownEffect(AutomationClientCommand)({
+      type: "automation.update",
+      commandId: "cmd-update",
+      automationId: "automation-1",
+      title: "Daily standup updated",
+      updatedAt: now,
+    });
+
+    assert.strictEqual(omitted.type, "automation.update");
+    assert.strictEqual(Object.hasOwn(omitted, "nextRunAt"), false);
+
+    const explicitNull = yield* Schema.decodeUnknownEffect(AutomationClientCommand)({
+      type: "automation.update",
+      commandId: "cmd-update",
+      automationId: "automation-1",
+      nextRunAt: null,
+      updatedAt: now,
+    });
+
+    assert.strictEqual(explicitNull.type, "automation.update");
+    assert.strictEqual(Object.hasOwn(explicitNull, "nextRunAt"), true);
+    assert.strictEqual(explicitNull.nextRunAt, null);
+  }),
+);
+
+it.effect("rejects deleted as a client settable status", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      Schema.decodeUnknownEffect(AutomationClientCommand)({
+        type: "automation.status.set",
+        commandId: "cmd-status",
+        automationId: "automation-1",
+        status: "deleted",
+        updatedAt: now,
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
+it.effect("rejects non-terminal run completion statuses", () =>
+  Effect.gen(function* () {
+    for (const status of ["pending", "running"] as const) {
+      const result = yield* Effect.exit(
+        Schema.decodeUnknownEffect(AutomationCommand)({
+          type: "automation.run.complete",
+          commandId: "cmd-run-complete",
+          runId: "run-1",
+          automationId: "automation-1",
+          status,
+          errorMessage: null,
+          skippedReason: null,
+          changedFiles: [],
+          completedAt: now,
+        }),
+      );
+
+      assert.strictEqual(result._tag, "Failure");
+    }
+  }),
+);
+
+it.effect("rejects run completed events with non-terminal status", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      Schema.decodeUnknownEffect(AutomationEvent)({
+        sequence: 1,
+        eventId: "event-1",
+        aggregateKind: "automationRun",
+        aggregateId: "run-1",
+        type: "automation.run-completed",
+        occurredAt: now,
+        commandId: "cmd-run-complete",
+        causationEventId: null,
+        correlationId: "cmd-run-complete",
+        metadata: {},
+        payload: {
+          run: {
+            id: "run-1",
+            automationId: "automation-1",
+            status: "running",
+            trigger: "manual",
+            resultThreadId: null,
+            orchestrationCommandIds: [],
+            startedAt: now,
+            completedAt: now,
+            errorMessage: null,
+            skippedReason: null,
+            changedFiles: [],
+            createdAt: now,
+            updatedAt: now,
+          },
+        },
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
 it.effect("decodes run record events and snapshots", () =>
   Effect.gen(function* () {
     const event = yield* Schema.decodeUnknownEffect(AutomationEvent)({
@@ -133,6 +239,74 @@ it.effect("decodes run record events and snapshots", () =>
       automations: [],
       runsByAutomationId: { "automation-1": [event.payload.run] },
     });
+  }),
+);
+
+it.effect("decodes automation websocket dispatch requests", () =>
+  Effect.gen(function* () {
+    const parsed = yield* Schema.decodeUnknownEffect(WebSocketRequest)({
+      id: "req-automation-dispatch-1",
+      body: {
+        _tag: AUTOMATION_WS_METHODS.dispatchCommand,
+        command: {
+          type: "automation.status.set",
+          commandId: "cmd-automation-status-1",
+          automationId: "automation-1",
+          status: "enabled",
+          updatedAt: now,
+        },
+      },
+    });
+
+    assert.strictEqual(parsed.body._tag, AUTOMATION_WS_METHODS.dispatchCommand);
+    if (parsed.body._tag === AUTOMATION_WS_METHODS.dispatchCommand) {
+      assert.strictEqual(parsed.body.command.type, "automation.status.set");
+    }
+  }),
+);
+
+it.effect("decodes automation websocket event pushes", () =>
+  Effect.gen(function* () {
+    const parsed = yield* Schema.decodeUnknownEffect(WsResponse)({
+      type: "push",
+      sequence: 5,
+      channel: AUTOMATION_WS_CHANNELS.event,
+      data: {
+        sequence: 1,
+        eventId: "event-automation-1",
+        aggregateKind: "automationRun",
+        aggregateId: "run-1",
+        occurredAt: now,
+        commandId: "cmd-run-complete",
+        causationEventId: null,
+        correlationId: "cmd-run-complete",
+        metadata: {},
+        type: "automation.run-completed",
+        payload: {
+          run: {
+            id: "run-1",
+            automationId: "automation-1",
+            status: "completed",
+            trigger: "manual",
+            resultThreadId: null,
+            orchestrationCommandIds: [],
+            startedAt: now,
+            completedAt: now,
+            errorMessage: null,
+            skippedReason: null,
+            changedFiles: [],
+            createdAt: now,
+            updatedAt: now,
+          },
+        },
+      },
+    });
+
+    if (!("type" in parsed) || parsed.type !== "push") {
+      assert.fail("expected websocket response to decode as a push envelope");
+    }
+
+    assert.strictEqual(parsed.channel, AUTOMATION_WS_CHANNELS.event);
   }),
 );
 
