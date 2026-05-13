@@ -8,6 +8,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const TARGET_SAMPLE_RATE = 24_000;
 const BUFFER_SIZE = 4_096;
+const GENERIC_UNAVAILABLE_MESSAGE = "Microphone recording is unavailable in this browser.";
+const INSECURE_CONTEXT_UNAVAILABLE_MESSAGE =
+  "Microphone recording requires a secure browser context. Open BroCode from localhost, 127.0.0.1, or HTTPS.";
 
 export interface VoiceRecordingPayload {
   readonly audioBase64: string;
@@ -29,11 +32,75 @@ interface RecorderRuntime {
 
 const MAX_WAVEFORM_SAMPLES = 160;
 
+type VoiceGetUserMedia = (constraints: MediaStreamConstraints) => Promise<MediaStream>;
+type LegacyGetUserMedia = (
+  constraints: MediaStreamConstraints,
+  resolve: (stream: MediaStream) => void,
+  reject: (error: unknown) => void,
+) => void;
+
+interface VoiceRecordingNavigator {
+  readonly mediaDevices?: {
+    readonly getUserMedia?: VoiceGetUserMedia;
+  };
+  readonly getUserMedia?: LegacyGetUserMedia;
+  readonly webkitGetUserMedia?: LegacyGetUserMedia;
+  readonly mozGetUserMedia?: LegacyGetUserMedia;
+}
+
+interface VoiceRecordingSupportEnvironment {
+  readonly isSecureContext?: boolean;
+  readonly navigator?: VoiceRecordingNavigator;
+}
+
 export function formatVoiceRecordingDuration(durationMs: number): string {
   const totalSeconds = Math.max(0, Math.floor(durationMs / 1_000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function readVoiceRecordingSupportEnvironment(): VoiceRecordingSupportEnvironment {
+  return {
+    isSecureContext: typeof window === "undefined" ? undefined : window.isSecureContext,
+    navigator:
+      typeof navigator === "undefined" ? undefined : (navigator as VoiceRecordingNavigator),
+  };
+}
+
+export function resolveGetUserMedia(
+  navigatorLike: VoiceRecordingNavigator | undefined =
+    readVoiceRecordingSupportEnvironment().navigator,
+): VoiceGetUserMedia | null {
+  const mediaDevices = navigatorLike?.mediaDevices;
+  if (typeof mediaDevices?.getUserMedia === "function") {
+    return mediaDevices.getUserMedia.bind(mediaDevices);
+  }
+
+  const legacyGetUserMedia =
+    navigatorLike?.getUserMedia ??
+    navigatorLike?.webkitGetUserMedia ??
+    navigatorLike?.mozGetUserMedia;
+  if (typeof legacyGetUserMedia !== "function") {
+    return null;
+  }
+
+  return (constraints) =>
+    new Promise<MediaStream>((resolve, reject) => {
+      legacyGetUserMedia.call(navigatorLike, constraints, resolve, reject);
+    });
+}
+
+export function getVoiceRecordingUnavailableReason(
+  environment: VoiceRecordingSupportEnvironment = readVoiceRecordingSupportEnvironment(),
+): string | null {
+  if (resolveGetUserMedia(environment.navigator)) {
+    return null;
+  }
+  if (environment.isSecureContext === false) {
+    return INSECURE_CONTEXT_UNAVAILABLE_MESSAGE;
+  }
+  return GENERIC_UNAVAILABLE_MESSAGE;
 }
 
 export function useVoiceRecorder() {
@@ -85,8 +152,12 @@ export function useVoiceRecorder() {
     if (runtimeRef.current) {
       throw new Error("Voice recording is already running.");
     }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Microphone recording is unavailable in this browser.");
+    const supportEnvironment = readVoiceRecordingSupportEnvironment();
+    const getUserMedia = resolveGetUserMedia(supportEnvironment.navigator);
+    if (!getUserMedia) {
+      throw new Error(
+        getVoiceRecordingUnavailableReason(supportEnvironment) ?? GENERIC_UNAVAILABLE_MESSAGE,
+      );
     }
 
     let stream: MediaStream | null = null;
@@ -96,7 +167,7 @@ export function useVoiceRecorder() {
     let silentGainNode: GainNode | null = null;
 
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
+      stream = await getUserMedia({
         audio: {
           channelCount: 1,
           echoCancellation: true,

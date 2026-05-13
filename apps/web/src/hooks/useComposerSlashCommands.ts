@@ -138,8 +138,8 @@ export function useComposerSlashCommands(input: {
       !api ||
       !canOfferCompactCommand ||
       !isServerThread ||
-      !activeThread?.session ||
-      activeThread.session.status === "closed"
+      !activeThread ||
+      activeThread.session?.status === "closed"
     ) {
       toastManager.add({
         type: "warning",

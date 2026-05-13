@@ -47,6 +47,14 @@ function normalizeSelectedOptionLabels(value: string[] | undefined): string[] {
   return Array.from(new Set(normalized));
 }
 
+function resolveDefaultOptionLabel(question: UserInputQuestion): string | null {
+  if (question.multiSelect) {
+    return null;
+  }
+  const label = question.options[0]?.label.trim();
+  return label && label.length > 0 ? label : null;
+}
+
 export function resolvePendingUserInputAnswer(
   question: UserInputQuestion,
   draft: PendingUserInputDraftAnswer | undefined,
@@ -61,7 +69,7 @@ export function resolvePendingUserInputAnswer(
     return selectedOptionLabels.length > 0 ? selectedOptionLabels : null;
   }
 
-  return selectedOptionLabels[0] ?? null;
+  return selectedOptionLabels[0] ?? resolveDefaultOptionLabel(question);
 }
 
 export function setPendingUserInputCustomAnswer(
@@ -163,7 +171,10 @@ export function derivePendingUserInputProgress(
     questionIndex: normalizedQuestionIndex,
     activeQuestion,
     activeDraft,
-    selectedOptionLabels: normalizeSelectedOptionLabels(activeDraft?.selectedOptionLabels),
+    selectedOptionLabels:
+      resolvedAnswer && typeof resolvedAnswer === "string"
+        ? [resolvedAnswer]
+        : normalizeSelectedOptionLabels(activeDraft?.selectedOptionLabels),
     customAnswer,
     resolvedAnswer,
     usingCustomAnswer: customAnswer.trim().length > 0,

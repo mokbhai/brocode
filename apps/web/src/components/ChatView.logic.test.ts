@@ -18,10 +18,13 @@ import {
   shouldAutoDeleteTerminalThreadOnLastClose,
   shouldConsumePendingCustomBinaryConfirmation,
   shouldNavigateComposerInputHistory,
+  shouldStoreComposerTurnInLocalQueue,
   shouldResetComposerInputHistoryAfterPromptChange,
   shouldShowComposerModelBootstrapSkeleton,
   shouldStartActiveTurnLayoutGrace,
   shouldRenderTerminalWorkspace,
+  shouldOfferCompactSlashCommand,
+  shouldShowRunningTurnQueueAction,
   resolveComposerInputHistoryNavigation,
 } from "./ChatView.logic";
 
@@ -320,6 +323,104 @@ describe("composer input history", () => {
         nextPrompt: "third with edit",
       }),
     ).toBe(true);
+  });
+});
+
+describe("composer slash command availability", () => {
+  it("offers /compact for resumable server threads without an active session", () => {
+    expect(
+      shouldOfferCompactSlashCommand({
+        supportsThreadCompaction: true,
+        isServerThread: true,
+        activeThread: {
+          session: null,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("does not offer /compact for unsupported, local, missing, or closed threads", () => {
+    expect(
+      shouldOfferCompactSlashCommand({
+        supportsThreadCompaction: false,
+        isServerThread: true,
+        activeThread: { session: null },
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferCompactSlashCommand({
+        supportsThreadCompaction: true,
+        isServerThread: false,
+        activeThread: { session: null },
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferCompactSlashCommand({
+        supportsThreadCompaction: true,
+        isServerThread: true,
+        activeThread: undefined,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOfferCompactSlashCommand({
+        supportsThreadCompaction: true,
+        isServerThread: true,
+        activeThread: { session: { status: "closed" } as never },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldStoreComposerTurnInLocalQueue", () => {
+  it("does not keep queued follow-ups local for running server threads", () => {
+    expect(
+      shouldStoreComposerTurnInLocalQueue({
+        hasLiveTurn: true,
+        dispatchMode: "queue",
+        isQueuedTurnRetry: false,
+        isServerThread: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps the fallback local queue for non-server live threads", () => {
+    expect(
+      shouldStoreComposerTurnInLocalQueue({
+        hasLiveTurn: true,
+        dispatchMode: "queue",
+        isQueuedTurnRetry: false,
+        isServerThread: false,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("shouldShowRunningTurnQueueAction", () => {
+  it("keeps a queue send action available while a turn is running", () => {
+    expect(
+      shouldShowRunningTurnQueueAction({
+        phase: "running",
+        hasSendableContent: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("hides the queue send action when there is nothing to send", () => {
+    expect(
+      shouldShowRunningTurnQueueAction({
+        phase: "running",
+        hasSendableContent: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not show the running queue action after the turn settles", () => {
+    expect(
+      shouldShowRunningTurnQueueAction({
+        phase: "idle",
+        hasSendableContent: true,
+      }),
+    ).toBe(false);
   });
 });
 

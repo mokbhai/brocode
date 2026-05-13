@@ -199,6 +199,40 @@ export function resolveActiveThreadTitle(input: {
   return input.title;
 }
 
+export function shouldOfferCompactSlashCommand(input: {
+  supportsThreadCompaction: boolean;
+  isServerThread: boolean;
+  activeThread: Pick<Thread, "session"> | undefined;
+}): boolean {
+  return (
+    input.supportsThreadCompaction &&
+    input.isServerThread &&
+    input.activeThread !== undefined &&
+    input.activeThread.session?.status !== "closed"
+  );
+}
+
+export function shouldStoreComposerTurnInLocalQueue(input: {
+  hasLiveTurn: boolean;
+  dispatchMode: "queue" | "steer";
+  isQueuedTurnRetry: boolean;
+  isServerThread: boolean;
+}): boolean {
+  return (
+    input.hasLiveTurn &&
+    input.dispatchMode === "queue" &&
+    !input.isQueuedTurnRetry &&
+    !input.isServerThread
+  );
+}
+
+export function shouldShowRunningTurnQueueAction(input: {
+  phase: SessionPhase;
+  hasSendableContent: boolean;
+}): boolean {
+  return input.phase === "running" && input.hasSendableContent;
+}
+
 // Sidechats carry imported fork history for provider context, but their transcript should start
 // visually clean so only new sidechat turns appear in the pane.
 export function filterSidechatTranscriptMessages(

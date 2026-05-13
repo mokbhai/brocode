@@ -1695,6 +1695,17 @@ export default function Sidebar() {
     [navigate],
   );
 
+  const handleStartAddProject = useCallback(() => {
+    setAddProjectError(null);
+    setShowManualPathInput(false);
+    setAddingProject((prev) => !prev);
+  }, []);
+
+  const currentProjectShortcutTargetId = useMemo(
+    () => resolveCurrentProjectTargetId(projects, focusedProjectId),
+    [focusedProjectId, projects],
+  );
+
   const handleSidebarViewChange = useCallback(
     (view: SidebarView) => {
       if (view === "workspace") {
@@ -1999,17 +2010,6 @@ export default function Sidebar() {
       setIsPickingFolder(false);
     }
   }, [isPickingFolder, addProjectFromPath]);
-
-  const handleStartAddProject = useCallback(() => {
-    setAddProjectError(null);
-    setShowManualPathInput(false);
-    setAddingProject((prev) => !prev);
-  }, []);
-
-  const currentProjectShortcutTargetId = useMemo(
-    () => resolveCurrentProjectTargetId(projects, focusedProjectId),
-    [focusedProjectId, projects],
-  );
 
   const handlePrimaryNewThread = useCallback(() => {
     if (currentProjectShortcutTargetId) {

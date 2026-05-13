@@ -104,7 +104,10 @@ import {
   enrichSubagentWorkEntries,
   resolveActiveThreadTitle,
   shouldConsumePendingCustomBinaryConfirmation,
+  shouldOfferCompactSlashCommand,
   shouldShowComposerModelBootstrapSkeleton,
+  shouldShowRunningTurnQueueAction,
+  shouldStoreComposerTurnInLocalQueue,
 } from "./ChatView.logic";
 import {
   createRelevantWorkLogThreadsSelector,
@@ -1857,6 +1860,10 @@ export default function ChatView({
   const isSendBusy = localDispatch !== null && !serverAcknowledgedLocalDispatch;
   const isPreparingWorktree = localDispatch?.preparingWorktree ?? false;
   const hasLiveTurn = phase === "running";
+  const showRunningTurnQueueAction = shouldShowRunningTurnQueueAction({
+    phase,
+    hasSendableContent: composerSendState.hasSendableContent,
+  });
   const isWorking = hasLiveTurn || isSendBusy || isConnecting || isRevertingCheckpoint;
   const hasStreamingAssistantText =
     activeThread?.messages.some((message) => message.role === "assistant" && message.streaming) ??
@@ -2393,6 +2400,11 @@ export default function ChatView({
     codexDynamicAgentsQuery.data,
     openCodeDynamicAgentsQuery.data,
   ]);
+  const canOfferCompactCommand = shouldOfferCompactSlashCommand({
+    supportsThreadCompaction: supportsThreadCompaction(providerComposerCapabilitiesQuery.data),
+    isServerThread,
+    activeThread,
+  });
   const normalComposerMenuItems = useComposerCommandMenuItems({
     composerTrigger: effectiveComposerTrigger,
     provider: selectedProvider,
@@ -2402,11 +2414,7 @@ export default function ChatView({
     workspaceEntries,
     searchableModelOptions,
     supportsFastSlashCommand,
-    canOfferCompactCommand:
-      supportsThreadCompaction(providerComposerCapabilitiesQuery.data) &&
-      isServerThread &&
-      activeThread?.session !== null &&
-      activeThread?.session?.status !== "closed",
+    canOfferCompactCommand,
     canOfferReviewCommand,
     canOfferForkCommand,
     canOfferSideCommand,
@@ -5049,7 +5057,14 @@ export default function ChatView({
         draftText: trimmed,
         planMarkdown: activeProposedPlan.planMarkdown,
       });
-      if (hasLiveTurn && dispatchMode === "queue" && queuedChatTurn === null) {
+      if (
+        shouldStoreComposerTurnInLocalQueue({
+          hasLiveTurn,
+          dispatchMode,
+          isQueuedTurnRetry: queuedChatTurn !== null,
+          isServerThread,
+        })
+      ) {
         clearComposerInput(activeThread.id);
         enqueueQueuedComposerTurn(activeThread.id, {
           id: randomUUID(),
@@ -5142,7 +5157,14 @@ export default function ChatView({
       });
     }
 
-    if (hasLiveTurn && dispatchMode === "queue" && queuedChatTurn === null) {
+    if (
+      shouldStoreComposerTurnInLocalQueue({
+        hasLiveTurn,
+        dispatchMode,
+        isQueuedTurnRetry: queuedChatTurn !== null,
+        isServerThread,
+      })
+    ) {
       clearComposerInput(activeThread.id);
       const queuedImagesForPersistence = await Promise.all(
         composerImagesForSend.map(async (image) => {
@@ -6686,11 +6708,7 @@ export default function ChatView({
     activeRootBranch,
     isServerThread,
     supportsFastSlashCommand,
-    canOfferCompactCommand:
-      supportsThreadCompaction(providerComposerCapabilitiesQuery.data) &&
-      isServerThread &&
-      activeThread?.session !== null &&
-      activeThread?.session?.status !== "closed",
+    canOfferCompactCommand,
     canOfferSideCommand,
     supportsTextNativeReviewCommand,
     fastModeEnabled,
@@ -7603,15 +7621,45 @@ export default function ChatView({
                       </Button>
                     </div>
                   ) : phase === "running" ? (
-                    <button
-                      type="button"
-                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[var(--color-text-foreground)] text-[var(--color-background-surface)] transition-all duration-150 hover:scale-105 sm:h-[26px] sm:w-[26px]"
-                      onClick={() => void onInterrupt()}
-                      aria-label="Stop generation"
-                      title="Stop the current response. On Mac, press Ctrl+C to interrupt."
-                    >
-                      <span aria-hidden="true" className="block size-2 rounded-[2px] bg-current" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[var(--color-text-foreground)] text-[var(--color-background-surface)] transition-all duration-150 hover:scale-105 sm:h-[26px] sm:w-[26px]"
+                        onClick={() => void onInterrupt()}
+                        aria-label="Stop generation"
+                        title="Stop the current response. On Mac, press Ctrl+C to interrupt."
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="block size-2 rounded-[2px] bg-current"
+                        />
+                      </button>
+                      {showRunningTurnQueueAction ? (
+                        <button
+                          type="submit"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-text-foreground)] text-[var(--color-background-surface)] transition-all duration-150 hover:scale-105 disabled:opacity-20 disabled:hover:scale-100 sm:h-8 sm:w-8"
+                          disabled={isSendBusy || isConnecting || isVoiceTranscribing}
+                          aria-label="Queue follow-up"
+                          title="Queue this follow-up after the current response"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 14 14"
+                            fill="none"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      ) : null}
+                    </div>
                   ) : pendingUserInputs.length === 0 &&
                     !isVoiceRecording &&
                     !isVoiceTranscribing ? (
@@ -8368,18 +8416,45 @@ export default function ChatView({
                                   </Button>
                                 </div>
                               ) : phase === "running" ? (
-                                <button
-                                  type="button"
-                                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[var(--color-text-foreground)] text-[var(--color-background-surface)] transition-all duration-150 hover:scale-105 sm:h-[26px] sm:w-[26px]"
-                                  onClick={() => void onInterrupt()}
-                                  aria-label="Stop generation"
-                                  title="Stop the current response. On Mac, press Ctrl+C to interrupt."
-                                >
-                                  <span
-                                    aria-hidden="true"
-                                    className="block size-2 rounded-[2px] bg-current"
-                                  />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[var(--color-text-foreground)] text-[var(--color-background-surface)] transition-all duration-150 hover:scale-105 sm:h-[26px] sm:w-[26px]"
+                                    onClick={() => void onInterrupt()}
+                                    aria-label="Stop generation"
+                                    title="Stop the current response. On Mac, press Ctrl+C to interrupt."
+                                  >
+                                    <span
+                                      aria-hidden="true"
+                                      className="block size-2 rounded-[2px] bg-current"
+                                    />
+                                  </button>
+                                  {showRunningTurnQueueAction ? (
+                                    <button
+                                      type="submit"
+                                      className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-text-foreground)] text-[var(--color-background-surface)] transition-all duration-150 hover:scale-105 disabled:opacity-20 disabled:hover:scale-100 sm:h-8 sm:w-8"
+                                      disabled={isSendBusy || isConnecting || isVoiceTranscribing}
+                                      aria-label="Queue follow-up"
+                                      title="Queue this follow-up after the current response"
+                                    >
+                                      <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 14 14"
+                                        fill="none"
+                                        aria-hidden="true"
+                                      >
+                                        <path
+                                          d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
+                                          stroke="currentColor"
+                                          strokeWidth="1.8"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                    </button>
+                                  ) : null}
+                                </div>
                               ) : pendingUserInputs.length === 0 &&
                                 !isVoiceRecording &&
                                 !isVoiceTranscribing ? (
