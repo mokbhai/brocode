@@ -56,7 +56,6 @@ const readyCard = (status: KanbanCard["status"] = "ready"): KanbanCard => ({
   reviewerThreadIds: [],
   title: "Build Kanban orchestration",
   description: "Create the server domain surface",
-  specPath: "docs/spec.md",
   status,
   modelSelection: { provider: "codex", model: "gpt-5" },
   runtimeMode: "full-access",
@@ -103,7 +102,7 @@ describe("decideKanbanCommand", () => {
     });
   });
 
-  it("creates a card with required spec, model, runtime, and initial tasks", async () => {
+  it("creates a card from user intent and emits no user-provided tasks", async () => {
     const events = asEvents(
       await runDecision(
         {
@@ -115,22 +114,8 @@ describe("decideKanbanCommand", () => {
           sourceThreadId: ThreadId.makeUnsafe("thread_1"),
           title: "Build Kanban orchestration",
           description: "Create the server domain surface",
-          specPath: "docs/spec.md",
-          tasks: [
-            {
-              taskId: KanbanTaskId.makeUnsafe("task_1"),
-              title: "Write decider",
-              status: "todo",
-              order: 0,
-            },
-          ],
           modelSelection: { provider: "codex", model: "gpt-5" },
           runtimeMode: "full-access",
-          branch: null,
-          worktreePath: null,
-          associatedWorktreePath: null,
-          associatedWorktreeBranch: null,
-          associatedWorktreeRef: null,
           createdAt: now,
         },
         readModelWithBoard(),
@@ -147,25 +132,21 @@ describe("decideKanbanCommand", () => {
       boardId,
       projectId,
       sourceThreadId: "thread_1",
-      specPath: "docs/spec.md",
       status: "draft",
       modelSelection: { provider: "codex", model: "gpt-5" },
       runtimeMode: "full-access",
+      branch: null,
+      worktreePath: null,
+      associatedWorktreePath: null,
+      associatedWorktreeBranch: null,
+      associatedWorktreeRef: null,
       loopCount: 0,
       maxLoopCount: 3,
     });
-    expect(event.payload.tasks).toEqual([
-      expect.objectContaining({
-        id: "task_1",
-        cardId,
-        title: "Write decider",
-        status: "todo",
-        order: 0,
-      }),
-    ]);
+    expect(event.payload.tasks).toEqual([]);
   });
 
-  it("creates a card without specPath when a thread or inline spec is the source", async () => {
+  it("creates a card without a separate spec path", async () => {
     const command = {
       type: "kanban.card.create",
       commandId: CommandId.makeUnsafe("cmd_card_create_without_spec"),
@@ -174,14 +155,8 @@ describe("decideKanbanCommand", () => {
       projectId,
       sourceThreadId: null,
       title: "Build Kanban orchestration",
-      tasks: [],
       modelSelection: { provider: "codex", model: "gpt-5" },
       runtimeMode: "full-access",
-      branch: null,
-      worktreePath: null,
-      associatedWorktreePath: null,
-      associatedWorktreeBranch: null,
-      associatedWorktreeRef: null,
       createdAt: now,
     } as KanbanCommand;
 
@@ -194,7 +169,7 @@ describe("decideKanbanCommand", () => {
       id: cardId,
       title: "Build Kanban orchestration",
     });
-    expect(event.payload.card.specPath).toBeUndefined();
+    expect("specPath" in event.payload.card).toBe(false);
   });
 
   it("requires an existing board and absent card for card creation", async () => {
@@ -206,15 +181,8 @@ describe("decideKanbanCommand", () => {
       projectId,
       sourceThreadId: null,
       title: "Build Kanban orchestration",
-      specPath: "docs/spec.md",
-      tasks: [],
       modelSelection: { provider: "codex", model: "gpt-5" },
       runtimeMode: "full-access",
-      branch: null,
-      worktreePath: null,
-      associatedWorktreePath: null,
-      associatedWorktreeBranch: null,
-      associatedWorktreeRef: null,
       createdAt: now,
     };
 
@@ -230,7 +198,7 @@ describe("decideKanbanCommand", () => {
     expect(String(duplicateCard.cause)).toContain("already exists");
   });
 
-  it("updates card metadata and can clear optional description and specPath", async () => {
+  it("updates public card metadata without exposing a separate spec path", async () => {
     const events = asEvents(
       await runDecision(
         {
@@ -239,7 +207,6 @@ describe("decideKanbanCommand", () => {
           cardId,
           title: "Updated Kanban orchestration",
           description: null,
-          specPath: null,
           runtimeMode: "approval-required",
           updatedAt: now,
         },
@@ -259,7 +226,41 @@ describe("decideKanbanCommand", () => {
       runtimeMode: "approval-required",
     });
     expect(event.payload.card.description).toBeUndefined();
-    expect(event.payload.card.specPath).toBeUndefined();
+    expect("specPath" in event.payload.card).toBe(false);
+  });
+
+  it("updates server-owned worktree metadata through the internal worktree command", async () => {
+    const events = asEvents(
+      await runDecision(
+        {
+          type: "kanban.card.worktree.set",
+          commandId: CommandId.makeUnsafe("cmd_card_worktree_set"),
+          cardId,
+          branch: "feat/card-1",
+          worktreePath: "/tmp/card-1",
+          associatedWorktreePath: "/repo",
+          associatedWorktreeBranch: "main",
+          associatedWorktreeRef: "abc123",
+          updatedAt: now,
+        },
+        {
+          ...readModelWithBoard(),
+          cards: [readyCard()],
+        },
+      ),
+    );
+    const event = events[0]!;
+
+    expect(events).toHaveLength(1);
+    expect(event.type).toBe("kanban.card.updated");
+    expect(event.payload.card).toMatchObject({
+      id: cardId,
+      branch: "feat/card-1",
+      worktreePath: "/tmp/card-1",
+      associatedWorktreePath: "/repo",
+      associatedWorktreeBranch: "main",
+      associatedWorktreeRef: "abc123",
+    });
   });
 
   it("requires an existing card for task upsert", async () => {

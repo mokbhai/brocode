@@ -50,7 +50,6 @@ function makeCard(): KanbanCard {
     reviewerThreadIds: [reviewerThreadId],
     title: "Implement board components",
     description: "Render columns, cards, and details.",
-    specPath: "docs/spec.md",
     status: "ready",
     modelSelection: {
       provider: "codex",
@@ -128,7 +127,6 @@ function makeSnapshot(): KanbanBoardSnapshot {
 
 function KanbanBoardHarness(props: {
   readonly onCreateCard: ReturnType<typeof vi.fn>;
-  readonly onDeleteTask: ReturnType<typeof vi.fn>;
   readonly onOpenSourceThread: ReturnType<typeof vi.fn>;
   readonly onOpenReviewerThread: ReturnType<typeof vi.fn>;
   readonly onOpenWorkerThread: ReturnType<typeof vi.fn>;
@@ -145,7 +143,6 @@ function KanbanBoardHarness(props: {
       onOpenReviewerThread={props.onOpenReviewerThread}
       onOpenWorkerThread={props.onOpenWorkerThread}
       onStartRun={props.onStartRun}
-      onDeleteTask={props.onDeleteTask}
     />
   );
 }
@@ -156,7 +153,6 @@ async function mountBoard() {
   document.body.append(host);
 
   const onCreateCard = vi.fn();
-  const onDeleteTask = vi.fn();
   const onOpenSourceThread = vi.fn();
   const onOpenReviewerThread = vi.fn();
   const onOpenWorkerThread = vi.fn();
@@ -164,7 +160,6 @@ async function mountBoard() {
   const screen = await render(
     <KanbanBoardHarness
       onCreateCard={onCreateCard}
-      onDeleteTask={onDeleteTask}
       onOpenSourceThread={onOpenSourceThread}
       onOpenReviewerThread={onOpenReviewerThread}
       onOpenWorkerThread={onOpenWorkerThread}
@@ -179,7 +174,6 @@ async function mountBoard() {
       host.remove();
     },
     onCreateCard,
-    onDeleteTask,
     onOpenSourceThread,
     onOpenReviewerThread,
     onOpenWorkerThread,
@@ -202,8 +196,11 @@ describe("KanbanBoard", () => {
       await expect.element(page.getByText("Implement board components")).toBeInTheDocument();
 
       await page.getByLabelText("Create Kanban card").click();
+      await expect.element(page.getByLabelText("Card source")).not.toBeInTheDocument();
+      await expect.element(page.getByLabelText("Spec path")).not.toBeInTheDocument();
+      await expect.element(page.getByLabelText("Initial tasks")).not.toBeInTheDocument();
       await page.getByLabelText("Title").fill("Create from board test");
-      await page.getByLabelText("Spec path").fill("docs/browser-created-card.md");
+      await page.getByLabelText("Description").fill("docs/browser-created-card.md");
       document.querySelector<HTMLFormElement>("form")?.requestSubmit();
 
       expect(mounted.onCreateCard).toHaveBeenCalledWith(
@@ -211,20 +208,20 @@ describe("KanbanBoard", () => {
           boardId,
           projectId,
           title: "Create from board test",
-          specPath: "docs/browser-created-card.md",
+          description: "docs/browser-created-card.md",
         }),
       );
+      expect(mounted.onCreateCard.mock.calls[0]?.[0]).not.toHaveProperty("specPath");
+      expect(mounted.onCreateCard.mock.calls[0]?.[0]).not.toHaveProperty("tasks");
 
       await page.getByRole("button", { name: /Implement board components/ }).click();
 
-      await expect.element(page.getByText("docs/spec.md")).toBeInTheDocument();
       await expect.element(page.getByRole("heading", { name: "Tasks" })).toBeInTheDocument();
 
       await page.getByRole("button", { name: /Start run/ }).click();
       await page.getByRole("button", { name: /Source thread/ }).click();
       await page.getByRole("button", { name: /Worker 1/ }).click();
       await page.getByRole("button", { name: /Reviewer 1/ }).click();
-      await page.getByRole("button", { name: /Delete Create card summary/ }).click();
 
       expect(mounted.onStartRun).toHaveBeenCalledWith(expect.objectContaining({ id: cardId }));
       expect(mounted.onOpenSourceThread).toHaveBeenCalledWith(
@@ -239,9 +236,9 @@ describe("KanbanBoard", () => {
         reviewerThreadId,
         expect.objectContaining({ id: cardId }),
       );
-      expect(mounted.onDeleteTask).toHaveBeenCalledWith(
-        expect.objectContaining({ cardId, taskId: "task-1" }),
-      );
+      await expect
+        .element(page.getByRole("button", { name: /Delete Create card summary/ }))
+        .not.toBeInTheDocument();
 
       await page.getByLabelText("Close").click();
       await expect.element(page.getByText("docs/spec.md")).not.toBeInTheDocument();

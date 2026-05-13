@@ -80,6 +80,7 @@ const NullableTrimmedString = Schema.optional(Schema.NullOr(TrimmedNonEmptyStrin
 const NullableBranchOrWorktree = Schema.optional(Schema.NullOr(TrimmedNonEmptyString)).pipe(
   Schema.withDecodingDefault(() => null),
 );
+const ForbiddenField = Schema.optional(Schema.Never);
 
 export const KanbanBoard = Schema.Struct({
   id: KanbanBoardId,
@@ -90,7 +91,7 @@ export const KanbanBoard = Schema.Struct({
 });
 export type KanbanBoard = typeof KanbanBoard.Type;
 
-export const KanbanCard = Schema.Struct({
+const KanbanCardFields = {
   id: KanbanCardId,
   boardId: KanbanBoardId,
   projectId: ProjectId,
@@ -103,7 +104,7 @@ export const KanbanCard = Schema.Struct({
   ),
   title: TrimmedNonEmptyString,
   description: Schema.optional(TrimmedNonEmptyString),
-  specPath: Schema.optional(TrimmedNonEmptyString),
+  specPath: ForbiddenField,
   status: KanbanCardStatus,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
@@ -117,8 +118,21 @@ export const KanbanCard = Schema.Struct({
   maxLoopCount: NonNegativeInt,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
+} as const;
+
+export const KanbanCard = Schema.Struct({
+  ...KanbanCardFields,
+  specPath: ForbiddenField,
 });
 export type KanbanCard = typeof KanbanCard.Type;
+
+const LegacyKanbanEventCard = Schema.Struct({
+  ...KanbanCardFields,
+  specPath: Schema.optional(TrimmedNonEmptyString),
+});
+
+export const KanbanEventCard = LegacyKanbanEventCard;
+export type KanbanEventCard = typeof KanbanEventCard.Type;
 
 export const KanbanTask = Schema.Struct({
   id: KanbanTaskId,
@@ -234,15 +248,15 @@ export const KanbanClientCommand = Schema.Union([
     sourceThreadId: NullableThreadId,
     title: TrimmedNonEmptyString,
     description: Schema.optional(TrimmedNonEmptyString),
-    specPath: Schema.optional(TrimmedNonEmptyString),
-    tasks: Schema.Array(KanbanCreateTaskInput),
+    specPath: ForbiddenField,
+    tasks: ForbiddenField,
     modelSelection: ModelSelection,
     runtimeMode: RuntimeMode,
-    branch: NullableBranchOrWorktree,
-    worktreePath: NullableBranchOrWorktree,
-    associatedWorktreePath: NullableTrimmedString,
-    associatedWorktreeBranch: NullableTrimmedString,
-    associatedWorktreeRef: NullableTrimmedString,
+    branch: ForbiddenField,
+    worktreePath: ForbiddenField,
+    associatedWorktreePath: ForbiddenField,
+    associatedWorktreeBranch: ForbiddenField,
+    associatedWorktreeRef: ForbiddenField,
     createdAt: IsoDateTime,
   }),
   Schema.Struct({
@@ -251,7 +265,12 @@ export const KanbanClientCommand = Schema.Union([
     cardId: KanbanCardId,
     title: Schema.optional(TrimmedNonEmptyString),
     description: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-    specPath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
+    specPath: ForbiddenField,
+    branch: ForbiddenField,
+    worktreePath: ForbiddenField,
+    associatedWorktreePath: ForbiddenField,
+    associatedWorktreeBranch: ForbiddenField,
+    associatedWorktreeRef: ForbiddenField,
     modelSelection: Schema.optional(ModelSelection),
     runtimeMode: Schema.optional(RuntimeMode),
     updatedAt: IsoDateTime,
@@ -263,20 +282,6 @@ export const KanbanClientCommand = Schema.Union([
     status: KanbanClientSettableCardStatus,
     reason: NullableTrimmedString,
     updatedAt: IsoDateTime,
-  }),
-  Schema.Struct({
-    type: Schema.Literal("kanban.task.upsert"),
-    commandId: CommandId,
-    cardId: KanbanCardId,
-    task: KanbanCreateTaskInput,
-    updatedAt: IsoDateTime,
-  }),
-  Schema.Struct({
-    type: Schema.Literal("kanban.task.delete"),
-    commandId: CommandId,
-    cardId: KanbanCardId,
-    taskId: KanbanTaskId,
-    deletedAt: IsoDateTime,
   }),
 ]);
 export type KanbanClientCommand = typeof KanbanClientCommand.Type;
@@ -326,6 +331,31 @@ export const KanbanInternalCommand = Schema.Union([
     cardId: KanbanCardId,
     readyAt: IsoDateTime,
   }),
+  Schema.Struct({
+    type: Schema.Literal("kanban.card.worktree.set"),
+    commandId: CommandId,
+    cardId: KanbanCardId,
+    branch: NullableBranchOrWorktree,
+    worktreePath: NullableBranchOrWorktree,
+    associatedWorktreePath: NullableTrimmedString,
+    associatedWorktreeBranch: NullableTrimmedString,
+    associatedWorktreeRef: NullableTrimmedString,
+    updatedAt: IsoDateTime,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("kanban.task.upsert"),
+    commandId: CommandId,
+    cardId: KanbanCardId,
+    task: KanbanCreateTaskInput,
+    updatedAt: IsoDateTime,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("kanban.task.delete"),
+    commandId: CommandId,
+    cardId: KanbanCardId,
+    taskId: KanbanTaskId,
+    deletedAt: IsoDateTime,
+  }),
 ]);
 export type KanbanInternalCommand = typeof KanbanInternalCommand.Type;
 
@@ -359,7 +389,7 @@ export const KanbanEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("kanban.card.created"),
     payload: Schema.Struct({
-      card: KanbanCard,
+      card: KanbanEventCard,
       tasks: Schema.Array(KanbanTask),
     }),
   }),
@@ -367,7 +397,7 @@ export const KanbanEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("kanban.card.updated"),
     payload: Schema.Struct({
-      card: KanbanCard,
+      card: KanbanEventCard,
     }),
   }),
   Schema.Struct({

@@ -43,7 +43,6 @@ interface CardRow {
   readonly reviewerThreadIdsJson: string;
   readonly title: string;
   readonly description: string | null;
-  readonly specPath: string | null;
   readonly status: string;
   readonly modelSelectionJson: string;
   readonly runtimeMode: string;
@@ -135,7 +134,6 @@ const makeKanbanSnapshotQuery = Effect.gen(function* () {
       reviewer_thread_ids_json AS "reviewerThreadIdsJson",
       title,
       description,
-      spec_path AS "specPath",
       status,
       model_selection_json AS "modelSelectionJson",
       runtime_mode AS "runtimeMode",
@@ -231,7 +229,6 @@ const makeKanbanSnapshotQuery = Effect.gen(function* () {
           reviewerThreadIds,
           title: row.title,
           ...optionalField("description", row.description),
-          ...optionalField("specPath", row.specPath),
           status: row.status,
           modelSelection,
           runtimeMode: row.runtimeMode,

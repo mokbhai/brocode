@@ -1,4 +1,4 @@
-import type { KanbanCard, KanbanEvent, KanbanRun } from "@t3tools/contracts";
+import type { KanbanCard, KanbanEvent, KanbanEventCard, KanbanRun } from "@t3tools/contracts";
 import { Effect, Layer, Semaphore, Stream } from "effect";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
@@ -17,6 +17,11 @@ function stringifyJson(value: unknown): string {
 
 function nullable<T>(value: T | undefined): T | null {
   return value ?? null;
+}
+
+function stripLegacySpecPath(card: KanbanEventCard): KanbanCard {
+  const { specPath: _specPath, ...nextCard } = card;
+  return nextCard;
 }
 
 const makeKanbanProjectionPipeline = Effect.gen(function* () {
@@ -119,7 +124,7 @@ const makeKanbanProjectionPipeline = Effect.gen(function* () {
         ${stringifyJson(card.reviewerThreadIds)},
         ${card.title},
         ${nullable(card.description)},
-        ${nullable(card.specPath)},
+        ${null},
         ${null},
         ${card.status},
         ${stringifyJson(card.modelSelection)},
@@ -268,12 +273,15 @@ const makeKanbanProjectionPipeline = Effect.gen(function* () {
 
       case "kanban.card.created":
         return Effect.all(
-          [upsertCard(event.payload.card), Effect.forEach(event.payload.tasks, upsertTask)],
+          [
+            upsertCard(stripLegacySpecPath(event.payload.card)),
+            Effect.forEach(event.payload.tasks, upsertTask),
+          ],
           { concurrency: 1 },
         ).pipe(Effect.asVoid);
 
       case "kanban.card.updated":
-        return upsertCard(event.payload.card);
+        return upsertCard(stripLegacySpecPath(event.payload.card));
 
       case "kanban.card.status-changed":
         return updateCardStatus({

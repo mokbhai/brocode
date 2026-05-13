@@ -34,7 +34,6 @@ import type { CreateKanbanCardInput } from "../../kanbanStore";
 import {
   buildCreateKanbanCardInput,
   createDefaultKanbanModelSelection,
-  type KanbanCreateCardMode,
 } from "./kanbanCreateCard.logic";
 
 const PROVIDER_OPTIONS: readonly ProviderKind[] = [
@@ -55,7 +54,6 @@ export interface KanbanCreateCardDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onCreateCard: (input: CreateKanbanCardInput) => Promise<void> | void;
-  readonly initialMode?: KanbanCreateCardMode;
   readonly initialSourceThreadId?: ThreadId | null;
   readonly initialTitle?: string;
   readonly initialModelSelection?: ModelSelection | null;
@@ -67,10 +65,6 @@ function isProviderKind(value: string): value is ProviderKind {
 
 function isRuntimeMode(value: string): value is RuntimeMode {
   return value === "full-access" || value === "approval-required";
-}
-
-function isCreateMode(value: string): value is KanbanCreateCardMode {
-  return value === "thread" || value === "specPath" || value === "manual";
 }
 
 function Field(props: {
@@ -92,27 +86,20 @@ export function KanbanCreateCardDialog({
   open,
   onOpenChange,
   onCreateCard,
-  initialMode,
   initialSourceThreadId = null,
   initialTitle,
   initialModelSelection = null,
 }: KanbanCreateCardDialogProps) {
   const defaultModelSelection = useMemo(() => createDefaultKanbanModelSelection(), []);
-  const [mode, setMode] = useState<KanbanCreateCardMode>("specPath");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [specPath, setSpecPath] = useState("");
-  const [inlineSpec, setInlineSpec] = useState("");
-  const [sourceThreadId, setSourceThreadId] = useState("");
   const [provider, setProvider] = useState<ProviderKind>(defaultModelSelection.provider);
   const [model, setModel] = useState(defaultModelSelection.model);
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>(DEFAULT_RUNTIME_MODE);
-  const [tasksText, setTasksText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const formErrorId = "kanban-create-card-error";
   const initialSeed = [
-    initialMode ?? "",
     initialSourceThreadId ?? "",
     initialTitle ?? "",
     initialModelSelection?.provider ?? "",
@@ -121,16 +108,11 @@ export function KanbanCreateCardDialog({
   const appliedInitialSeedRef = useRef<string | null>(null);
 
   const resetForm = () => {
-    setMode("specPath");
     setTitle("");
     setDescription("");
-    setSpecPath("");
-    setInlineSpec("");
-    setSourceThreadId("");
     setProvider(defaultModelSelection.provider);
     setModel(defaultModelSelection.model);
     setRuntimeMode(DEFAULT_RUNTIME_MODE);
-    setTasksText("");
     setError(null);
   };
 
@@ -139,12 +121,8 @@ export function KanbanCreateCardDialog({
       return;
     }
     appliedInitialSeedRef.current = initialSeed;
-    setMode(initialMode ?? (initialSourceThreadId ? "thread" : "specPath"));
     setTitle(initialTitle?.trim() ?? "");
     setDescription("");
-    setSpecPath("");
-    setInlineSpec("");
-    setSourceThreadId(initialSourceThreadId ?? "");
     if (initialModelSelection) {
       setProvider(initialModelSelection.provider);
       setModel(initialModelSelection.model);
@@ -153,12 +131,10 @@ export function KanbanCreateCardDialog({
       setModel(defaultModelSelection.model);
     }
     setRuntimeMode(DEFAULT_RUNTIME_MODE);
-    setTasksText("");
     setError(null);
   }, [
     defaultModelSelection.model,
     defaultModelSelection.provider,
-    initialMode,
     initialModelSelection,
     initialSeed,
     initialSourceThreadId,
@@ -179,15 +155,11 @@ export function KanbanCreateCardDialog({
         buildCreateKanbanCardInput({
           boardId: snapshot.board.id,
           projectId: snapshot.board.projectId,
-          mode,
           title,
           description,
-          specPath,
-          inlineSpec,
-          sourceThreadId: sourceThreadId.trim() ? (sourceThreadId.trim() as ThreadId) : null,
+          sourceThreadId: initialSourceThreadId,
           modelSelection,
           runtimeMode,
-          tasksText,
         }),
       );
       resetForm();
@@ -206,44 +178,12 @@ export function KanbanCreateCardDialog({
           <DialogHeader>
             <DialogTitle>Create Kanban card</DialogTitle>
             <DialogDescription>
-              Add a card to {snapshot.board.title} with an optional task checklist.
+              Add a card to {snapshot.board.title}.
             </DialogDescription>
           </DialogHeader>
 
           <DialogPanel className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Source">
-                <Select
-                  value={mode}
-                  onValueChange={(value) => {
-                    if (isCreateMode(value)) {
-                      setMode(value);
-                    }
-                  }}
-                >
-                  <SelectTrigger aria-label="Card source">
-                    <SelectValue>
-                      {mode === "thread"
-                        ? "Thread"
-                        : mode === "manual"
-                          ? "Inline spec"
-                          : "Spec path"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectPopup>
-                    <SelectItem hideIndicator value="specPath">
-                      Spec path
-                    </SelectItem>
-                    <SelectItem hideIndicator value="thread">
-                      Thread
-                    </SelectItem>
-                    <SelectItem hideIndicator value="manual">
-                      Inline spec
-                    </SelectItem>
-                  </SelectPopup>
-                </Select>
-              </Field>
-
               <Field label="Runtime mode">
                 <Select
                   value={runtimeMode}
@@ -285,43 +225,6 @@ export function KanbanCreateCardDialog({
               />
             </Field>
 
-            {mode === "thread" ? (
-              <Field label="Source thread">
-                <Input
-                  value={sourceThreadId}
-                  onChange={(event) => setSourceThreadId(event.currentTarget.value)}
-                  placeholder="thread-..."
-                  nativeInput
-                />
-              </Field>
-            ) : null}
-
-            <Field
-              label="Spec path"
-              hint={
-                mode === "specPath"
-                  ? "Required for spec path cards."
-                  : "Optional reference path for this card."
-              }
-            >
-              <Input
-                value={specPath}
-                onChange={(event) => setSpecPath(event.currentTarget.value)}
-                placeholder="docs/specs/kanban-task.md"
-                nativeInput
-              />
-            </Field>
-
-            {mode === "manual" ? (
-              <Field label="Inline spec" hint="Optional notes added to the card description.">
-                <Textarea
-                  value={inlineSpec}
-                  onChange={(event) => setInlineSpec(event.currentTarget.value)}
-                  placeholder="Describe the implementation target"
-                />
-              </Field>
-            ) : null}
-
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
               <Field label="Provider">
                 <Select
@@ -356,14 +259,6 @@ export function KanbanCreateCardDialog({
                 />
               </Field>
             </div>
-
-            <Field label="Initial tasks" hint="One task per line. Bullets are accepted.">
-              <Textarea
-                value={tasksText}
-                onChange={(event) => setTasksText(event.currentTarget.value)}
-                placeholder={"- Add payload tests\n- Wire dialog"}
-              />
-            </Field>
 
             {error ? (
               <div

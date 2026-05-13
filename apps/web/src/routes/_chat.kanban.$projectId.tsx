@@ -51,8 +51,6 @@ function KanbanProjectRouteView() {
   const createKanbanBoard = useKanbanStore((state) => state.createKanbanBoard);
   const createKanbanCard = useKanbanStore((state) => state.createKanbanCard);
   const updateKanbanCard = useKanbanStore((state) => state.updateKanbanCard);
-  const upsertKanbanTask = useKanbanStore((state) => state.upsertKanbanTask);
-  const deleteKanbanTask = useKanbanStore((state) => state.deleteKanbanTask);
   const [selectedCardId, setSelectedCardId] = useState<KanbanCard["id"] | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
@@ -174,13 +172,10 @@ function KanbanProjectRouteView() {
           onSelectCard={(cardId) => setSelectedCardId(cardId)}
           onCreateCard={createKanbanCard}
           onUpdateCard={updateKanbanCard}
-          onUpsertTask={upsertKanbanTask}
-          onDeleteTask={deleteKanbanTask}
           onOpenSourceThread={(threadId) => openThread(threadId)}
           onOpenWorkerThread={(threadId) => openThread(threadId)}
           onOpenReviewerThread={(threadId) => openThread(threadId)}
           initialCreateCardOpen={sourceThreadId !== null}
-          initialCreateCardMode={sourceThreadId ? "thread" : undefined}
           initialCreateCardSourceThreadId={sourceThreadId}
           initialCreateCardTitle={initialTitle}
           initialCreateCardModelSelection={initialModelSelection}

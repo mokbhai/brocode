@@ -58,27 +58,28 @@ function cardCreate(createdAt: string): KanbanCommand {
     sourceThreadId: null,
     title: "Snapshot Card",
     description: "Snapshot description",
-    specPath: "docs/snapshot.md",
-    tasks: [
-      {
-        taskId,
-        title: "Snapshot task",
-        description: "Task description",
-        status: "todo",
-        order: 0,
-      },
-    ],
     modelSelection: {
       provider: "codex",
       model: "gpt-5-codex",
     },
     runtimeMode: "approval-required",
-    branch: null,
-    worktreePath: null,
-    associatedWorktreePath: null,
-    associatedWorktreeBranch: null,
-    associatedWorktreeRef: null,
     createdAt,
+  };
+}
+
+function taskUpsert(updatedAt: string): KanbanCommand {
+  return {
+    type: "kanban.task.upsert",
+    commandId: CommandId.makeUnsafe("cmd-kanban-snapshot-task"),
+    cardId,
+    task: {
+      taskId,
+      title: "Snapshot task",
+      description: "Task description",
+      status: "todo",
+      order: 0,
+    },
+    updatedAt,
   };
 }
 
@@ -88,7 +89,8 @@ describe("KanbanSnapshotQuery", () => {
     const createdAt = "2026-05-12T00:09:00.000Z";
 
     await system.run(system.engine.dispatch(boardCreate(createdAt)));
-    const result = await system.run(system.engine.dispatch(cardCreate(createdAt)));
+    await system.run(system.engine.dispatch(cardCreate(createdAt)));
+    const result = await system.run(system.engine.dispatch(taskUpsert(createdAt)));
 
     const snapshot = await system.run(system.snapshotQuery.getSnapshot({ boardId }));
 
@@ -103,7 +105,6 @@ describe("KanbanSnapshotQuery", () => {
       id: cardId,
       boardId,
       title: "Snapshot Card",
-      specPath: "docs/snapshot.md",
       modelSelection: {
         provider: "codex",
         model: "gpt-5-codex",

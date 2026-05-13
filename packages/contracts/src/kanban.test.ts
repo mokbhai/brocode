@@ -20,6 +20,7 @@ import {
 } from "./kanban";
 
 const decodeKanbanCard = Schema.decodeUnknownEffect(KanbanCard);
+const decodeClientKanbanCommand = Schema.decodeUnknownEffect(ClientKanbanCommand);
 const decodeKanbanCommand = Schema.decodeUnknownEffect(KanbanCommand);
 const decodeKanbanRpcDispatchInput = Schema.decodeUnknownEffect(
   KanbanRpcSchemas.dispatchCommand.input,
@@ -43,7 +44,6 @@ const baseCard = {
   reviewerThreadIds: ["thread-reviewer-1"],
   title: "Implement task",
   description: "Detailed spec",
-  specPath: "docs/spec.md",
   status: "ready",
   modelSelection: {
     provider: "codex",
@@ -82,6 +82,46 @@ it.effect("decodes a card linked to project, source thread, agent threads, and w
   }),
 );
 
+it.effect("rejects specPath on public card read models", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decodeKanbanCard({
+        ...baseCard,
+        specPath: "docs/spec.md",
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+  }),
+);
+
+it.effect("decodes legacy card events with specPath for projection replay compatibility", () =>
+  Effect.gen(function* () {
+    const event = yield* decodeKanbanEvent({
+      sequence: 1,
+      eventId: "event-legacy-card",
+      aggregateKind: "card",
+      aggregateId: "card-1",
+      type: "kanban.card.created",
+      occurredAt: createdAt,
+      commandId: "cmd-1",
+      causationEventId: null,
+      correlationId: "cmd-1",
+      metadata: {},
+      payload: {
+        card: {
+          ...baseCard,
+          specPath: "docs/spec.md",
+        },
+        tasks: [],
+      },
+    });
+
+    assert.strictEqual(event.type, "kanban.card.created");
+    assert.strictEqual(event.payload.card.specPath, "docs/spec.md");
+  }),
+);
+
 it.effect("decodes a card without worker and reviewer thread links as empty arrays", () =>
   Effect.gen(function* () {
     const { workerThreadIds: _workerThreadIds, reviewerThreadIds: _reviewerThreadIds, ...card } =
@@ -114,7 +154,7 @@ it.effect("decodes omitted nullable card links as null", () =>
   }),
 );
 
-it.effect("decodes omitted branch and worktree path as null on cards and card create commands", () =>
+it.effect("decodes omitted branch and worktree path as null on cards", () =>
   Effect.gen(function* () {
     const { branch: _branch, worktreePath: _worktreePath, ...card } = baseCard;
 
@@ -122,26 +162,134 @@ it.effect("decodes omitted branch and worktree path as null on cards and card cr
 
     assert.strictEqual(parsedCard.branch, null);
     assert.strictEqual(parsedCard.worktreePath, null);
+  }),
+);
 
-    const parsedCommand = yield* decodeKanbanCommand({
+it.effect("rejects specPath, tasks, and worktree metadata on public card create commands", () =>
+  Effect.gen(function* () {
+    const createCommand = {
       type: "kanban.card.create",
-      commandId: "cmd-create-without-worktree",
+      commandId: "cmd-1",
       boardId: "board-1",
       cardId: "card-1",
       projectId: "project-1",
+      sourceThreadId: "thread-source",
       title: "Implement task",
-      tasks: [],
+      description: "Detailed spec",
       modelSelection: {
         provider: "codex",
         model: "gpt-5.2",
       },
       runtimeMode: "approval-required",
       createdAt,
-    });
+    };
 
-    assert.strictEqual(parsedCommand.type, "kanban.card.create");
-    assert.strictEqual(parsedCommand.branch, null);
-    assert.strictEqual(parsedCommand.worktreePath, null);
+    const parsed = yield* decodeClientKanbanCommand(createCommand);
+    assert.strictEqual(parsed.type, "kanban.card.create");
+
+    for (const forbidden of [
+      { specPath: "docs/spec.md" },
+      { tasks: [] },
+      { branch: "feat/card-1" },
+      { worktreePath: "/tmp/card-1" },
+      { associatedWorktreePath: "/repo" },
+      { associatedWorktreeBranch: "main" },
+      { associatedWorktreeRef: "abc123" },
+    ]) {
+      const result = yield* Effect.exit(
+        decodeClientKanbanCommand({
+          ...createCommand,
+          ...forbidden,
+        }),
+      );
+      assert.strictEqual(result._tag, "Failure");
+    }
+  }),
+);
+
+it.effect("rejects specPath and worktree metadata on public card update commands", () =>
+  Effect.gen(function* () {
+    const updateCommand = {
+      type: "kanban.card.update",
+      commandId: "cmd-update",
+      cardId: "card-1",
+      title: "Updated task",
+      updatedAt: createdAt,
+    };
+
+    const parsed = yield* decodeClientKanbanCommand(updateCommand);
+    assert.strictEqual(parsed.type, "kanban.card.update");
+
+    for (const forbidden of [
+      { specPath: "docs/spec.md" },
+      { branch: "feat/card-1" },
+      { worktreePath: "/tmp/card-1" },
+      { associatedWorktreePath: "/repo" },
+      { associatedWorktreeBranch: "main" },
+      { associatedWorktreeRef: "abc123" },
+    ]) {
+      const result = yield* Effect.exit(
+        decodeClientKanbanCommand({
+          ...updateCommand,
+          ...forbidden,
+        }),
+      );
+      assert.strictEqual(result._tag, "Failure");
+    }
+  }),
+);
+
+it.effect("rejects task mutation commands through public client command decoding", () =>
+  Effect.gen(function* () {
+    for (const command of [
+      {
+        type: "kanban.task.upsert",
+        commandId: "cmd-task-upsert",
+        cardId: "card-1",
+        task: {
+          taskId: "task-1",
+          title: "Write test",
+          status: "todo",
+          order: 0,
+        },
+        updatedAt: createdAt,
+      },
+      {
+        type: "kanban.task.delete",
+        commandId: "cmd-task-delete",
+        cardId: "card-1",
+        taskId: "task-1",
+        deletedAt: createdAt,
+      },
+    ]) {
+      const publicResult = yield* Effect.exit(decodeClientKanbanCommand(command));
+      assert.strictEqual(publicResult._tag, "Failure");
+
+      const internalResult = yield* Effect.exit(decodeKanbanCommand(command));
+      assert.strictEqual(internalResult._tag, "Success");
+    }
+  }),
+);
+
+it.effect("keeps worktree metadata mutation internal to the server command surface", () =>
+  Effect.gen(function* () {
+    const command = {
+      type: "kanban.card.worktree.set",
+      commandId: "cmd-worktree-set",
+      cardId: "card-1",
+      branch: "feat/card-1",
+      worktreePath: "/tmp/card-1",
+      associatedWorktreePath: "/repo",
+      associatedWorktreeBranch: "main",
+      associatedWorktreeRef: "abc123",
+      updatedAt: createdAt,
+    };
+
+    const publicResult = yield* Effect.exit(decodeClientKanbanCommand(command));
+    assert.strictEqual(publicResult._tag, "Failure");
+
+    const internalResult = yield* Effect.exit(decodeKanbanCommand(command));
+    assert.strictEqual(internalResult._tag, "Success");
   }),
 );
 
@@ -281,23 +429,11 @@ it.effect("decodes command, event, and read model schemas", () =>
       sourceThreadId: "thread-source",
       title: "Implement task",
       description: "Detailed spec",
-      specPath: "docs/spec.md",
-      tasks: [
-        {
-          taskId: "task-1",
-          title: "Write test",
-          description: "Pin schema behavior",
-          status: "todo",
-          order: 0,
-        },
-      ],
       modelSelection: {
         provider: "codex",
         model: "gpt-5.2",
       },
       runtimeMode: "approval-required",
-      branch: "feat/card-1",
-      worktreePath: "/tmp/card-1",
       createdAt,
     });
     assert.strictEqual(command.type, "kanban.card.create");

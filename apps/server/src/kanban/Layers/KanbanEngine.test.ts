@@ -2,7 +2,6 @@ import {
   CommandId,
   KanbanBoardId,
   KanbanCardId,
-  KanbanTaskId,
   ProjectId,
   type KanbanCommand,
   type KanbanEvent,
@@ -20,7 +19,6 @@ import { KanbanEngineService } from "../Services/KanbanEngine.ts";
 const projectId = ProjectId.makeUnsafe("project-kanban-engine");
 const boardId = KanbanBoardId.makeUnsafe("board-kanban-engine");
 const cardId = KanbanCardId.makeUnsafe("card-kanban-engine");
-const taskId = KanbanTaskId.makeUnsafe("task-kanban-engine");
 
 async function createKanbanSystem() {
   const projectionLayer = KanbanProjectionPipelineLive.pipe(Layer.provide(KanbanEventStoreLive));
@@ -60,25 +58,11 @@ function cardCreate(commandId: string, createdAt: string): KanbanCommand {
     sourceThreadId: null,
     title: "Engine Card",
     description: "Card created by the engine test",
-    specPath: "docs/spec.md",
-    tasks: [
-      {
-        taskId,
-        title: "First task",
-        status: "todo",
-        order: 0,
-      },
-    ],
     modelSelection: {
       provider: "codex",
       model: "gpt-5-codex",
     },
     runtimeMode: "approval-required",
-    branch: null,
-    worktreePath: null,
-    associatedWorktreePath: null,
-    associatedWorktreeBranch: null,
-    associatedWorktreeRef: null,
     createdAt,
   };
 }
@@ -120,7 +104,7 @@ describe("KanbanEngine", () => {
     expect(readModel.snapshotSequence).toBe(2);
     expect(readModel.boards.map((board) => board.id)).toEqual([boardId]);
     expect(readModel.cards.map((card) => card.id)).toEqual([cardId]);
-    expect(readModel.tasks.map((task) => task.id)).toEqual([taskId]);
+    expect(readModel.tasks).toEqual([]);
 
     const replayed = await system.run(
       Stream.runCollect(system.engine.readEvents(0)).pipe(

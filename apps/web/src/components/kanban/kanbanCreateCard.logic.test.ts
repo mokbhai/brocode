@@ -8,13 +8,16 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vitest";
 
-import { buildCreateKanbanCardInput } from "./kanbanCreateCard.logic";
+import {
+  buildCreateKanbanCardInput,
+  createDefaultKanbanModelSelection,
+} from "./kanbanCreateCard.logic";
 
 const boardId = "board-1" as KanbanBoardId;
 const projectId = "project-1" as ProjectId;
 
 describe("buildCreateKanbanCardInput", () => {
-  it("builds a create-from-thread payload with an optional spec path", () => {
+  it("builds a simple create-card payload from title, description, runtime, provider, and model", () => {
     const modelSelection = {
       provider: "claudeAgent",
       model: "claude-sonnet-4-6",
@@ -23,83 +26,84 @@ describe("buildCreateKanbanCardInput", () => {
     const input = buildCreateKanbanCardInput({
       boardId,
       projectId,
-      mode: "thread",
       title: "Implement review loop",
-      sourceThreadId: "thread-1" as ThreadId,
+      description: "Use the existing provider runtime.",
       modelSelection,
       runtimeMode: "approval-required",
-      tasks: [
-        {
-          title: "Add task list",
-          description: "Render persisted tasks",
-          status: "in_progress",
-        },
-      ],
     });
 
-    expect(input).toMatchObject({
+    expect(input).toEqual({
       boardId,
       projectId,
-      sourceThreadId: "thread-1",
+      sourceThreadId: null,
       title: "Implement review loop",
+      description: "Use the existing provider runtime.",
       modelSelection,
       runtimeMode: "approval-required",
-      tasks: [
-        {
-          title: "Add task list",
-          description: "Render persisted tasks",
-          status: "in_progress",
-          order: 0,
-        },
-      ],
     });
-    expect(input.specPath).toBeUndefined();
   });
 
-  it("builds a create-from-spec-path payload with default codex model and runtime", () => {
+  it("keeps sourceThreadId only as hidden metadata and omits removed fields", () => {
+    const modelSelection = createDefaultKanbanModelSelection();
+
     const input = buildCreateKanbanCardInput({
       boardId,
       projectId,
-      mode: "specPath",
-      title: "Build card creation",
-      specPath: "docs/kanban-card-creation.md",
-      tasksText: "Create dialog\n\nShape payloads",
+      title: "Create from current thread",
+      sourceThreadId: "thread-1" as ThreadId,
+      modelSelection,
+      runtimeMode: DEFAULT_RUNTIME_MODE,
     });
 
-    expect(input).toMatchObject({
+    expect(input).toEqual({
+      boardId,
+      projectId,
+      sourceThreadId: "thread-1",
+      title: "Create from current thread",
+      modelSelection,
+      runtimeMode: DEFAULT_RUNTIME_MODE,
+    });
+    expect(input).not.toHaveProperty("tasks");
+    expect(input).not.toHaveProperty("specPath");
+    expect(input).not.toHaveProperty("branch");
+    expect(input).not.toHaveProperty("worktreePath");
+  });
+
+  it("does not require source mode, spec path, inline spec, or initial tasks", () => {
+    const input = buildCreateKanbanCardInput({
+      boardId,
+      projectId,
+      title: "Build card creation",
+      description: "docs/kanban-card-creation.md\n\nShape payloads in the worker prompt.",
+      modelSelection: null,
+      runtimeMode: null,
+    });
+
+    expect(input).toEqual({
       boardId,
       projectId,
       sourceThreadId: null,
       title: "Build card creation",
-      specPath: "docs/kanban-card-creation.md",
+      description: "docs/kanban-card-creation.md\n\nShape payloads in the worker prompt.",
       modelSelection: {
         provider: "codex",
         model: DEFAULT_MODEL_BY_PROVIDER.codex,
       },
       runtimeMode: DEFAULT_RUNTIME_MODE,
-      tasks: [
-        { title: "Create dialog", status: "todo", order: 0 },
-        { title: "Shape payloads", status: "todo", order: 1 },
-      ],
     });
   });
 
-  it("builds a manual payload with optional spec path and inline notes", () => {
+  it("trims optional description and omits it when empty", () => {
     const input = buildCreateKanbanCardInput({
       boardId,
       projectId,
-      mode: "manual",
       title: "Polish empty state",
-      inlineSpec: "Make the no-card column easier to scan.",
-      tasksText: "- Tighten copy\n- Keep layout stable",
+      description: "   ",
+      modelSelection: createDefaultKanbanModelSelection(),
+      runtimeMode: DEFAULT_RUNTIME_MODE,
     });
 
-    expect(input.specPath).toBeUndefined();
-    expect(input.description).toBe("Inline spec:\n\nMake the no-card column easier to scan.");
-    expect(input.tasks).toEqual([
-      { title: "Tighten copy", status: "todo", order: 0 },
-      { title: "Keep layout stable", status: "todo", order: 1 },
-    ]);
+    expect(input).not.toHaveProperty("description");
   });
 
   it("rejects empty required fields before dispatch", () => {
@@ -107,20 +111,8 @@ describe("buildCreateKanbanCardInput", () => {
       buildCreateKanbanCardInput({
         boardId,
         projectId,
-        mode: "specPath",
         title: " ",
-        specPath: "docs/spec.md",
       }),
     ).toThrow("Title is required");
-
-    expect(() =>
-      buildCreateKanbanCardInput({
-        boardId,
-        projectId,
-        mode: "specPath",
-        title: "Spec card",
-        specPath: " ",
-      }),
-    ).toThrow("Spec path is required");
   });
 });

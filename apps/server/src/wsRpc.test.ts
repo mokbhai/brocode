@@ -2,7 +2,6 @@ import {
   CommandId,
   KanbanBoardId,
   KanbanCardId,
-  KanbanTaskId,
   ProjectId,
   type KanbanCommand,
   type KanbanEvent,
@@ -23,7 +22,6 @@ const projectId = ProjectId.makeUnsafe("project-kanban-ws");
 const boardId = KanbanBoardId.makeUnsafe("board-kanban-ws");
 const otherBoardId = KanbanBoardId.makeUnsafe("board-kanban-ws-other");
 const cardId = KanbanCardId.makeUnsafe("card-kanban-ws");
-const taskId = KanbanTaskId.makeUnsafe("task-kanban-ws");
 
 function boardCreate(commandId: string, targetBoardId = boardId): KanbanCommand {
   return {
@@ -45,22 +43,8 @@ function cardCreate(commandId: string): KanbanCommand {
     projectId,
     sourceThreadId: null,
     title: "Kanban WS Card",
-    specPath: "docs/kanban-ws.md",
-    tasks: [
-      {
-        taskId,
-        title: "Route this task",
-        status: "todo",
-        order: 0,
-      },
-    ],
     modelSelection: { provider: "codex", model: "gpt-5-codex" },
     runtimeMode: "approval-required",
-    branch: null,
-    worktreePath: null,
-    associatedWorktreePath: null,
-    associatedWorktreeBranch: null,
-    associatedWorktreeRef: null,
     createdAt: "2026-05-12T00:21:00.000Z",
   };
 }
@@ -100,7 +84,7 @@ describe("Kanban WebSocket RPC handlers", () => {
     const snapshot = await system.run(system.handlers["kanban.getSnapshot"]({ boardId }));
     expect(snapshot.board.id).toBe(boardId);
     expect(snapshot.cards.map((card) => card.id)).toEqual([cardId]);
-    expect(snapshot.tasksByCardId[cardId]?.map((task) => task.id)).toEqual([taskId]);
+    expect(snapshot.tasksByCardId[cardId] ?? []).toEqual([]);
 
     const streamedTypes: string[] = [];
     await system.run(

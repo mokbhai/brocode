@@ -2,6 +2,7 @@ import type {
   KanbanCard,
   KanbanCardId,
   KanbanEvent,
+  KanbanEventCard,
   KanbanReadModel,
   KanbanReview,
   KanbanRun,
@@ -86,6 +87,11 @@ function updateCard(
   return cards.map((card) => (card.id === cardId ? { ...card, ...patch } : card));
 }
 
+function stripLegacySpecPath(card: KanbanEventCard): KanbanCard {
+  const { specPath: _specPath, ...nextCard } = card;
+  return nextCard;
+}
+
 function appendUnique<T extends string>(entries: ReadonlyArray<T>, entry: T): ReadonlyArray<T> {
   return entries.includes(entry) ? entries : [...entries, entry];
 }
@@ -146,7 +152,7 @@ export function projectKanbanEvent(
       return decodeForEvent(KanbanCardCreatedPayload, event.payload, event.type).pipe(
         Effect.map((payload) => ({
           ...nextBase,
-          cards: upsertById(nextBase.cards, payload.card),
+          cards: upsertById(nextBase.cards, stripLegacySpecPath(payload.card)),
           tasks: upsertTasks(nextBase.tasks, payload.tasks),
         })),
       );
@@ -155,7 +161,7 @@ export function projectKanbanEvent(
       return decodeForEvent(KanbanCardUpdatedPayload, event.payload, event.type).pipe(
         Effect.map((payload) => ({
           ...nextBase,
-          cards: upsertById(nextBase.cards, payload.card),
+          cards: upsertById(nextBase.cards, stripLegacySpecPath(payload.card)),
         })),
       );
 

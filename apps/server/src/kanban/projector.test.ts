@@ -59,7 +59,6 @@ const cardCreated: KanbanEvent = {
       workerThreadIds: [],
       reviewerThreadIds: [],
       title: "Build Kanban orchestration",
-      specPath: "docs/spec.md",
       status: "draft",
       modelSelection: { provider: "codex", model: "gpt-5" },
       runtimeMode: "full-access",
@@ -157,6 +156,25 @@ describe("projectKanbanEvent", () => {
         status: "in_progress",
       }),
     ]);
+  });
+
+  it("strips legacy specPath from card event payloads during replay", async () => {
+    const initial = createEmptyKanbanReadModel("2026-05-12T00:00:00.000Z");
+    const next = await Effect.runPromise(
+      projectKanbanEvent(initial, {
+        ...cardCreated,
+        payload: {
+          ...cardCreated.payload,
+          card: {
+            ...cardCreated.payload.card,
+            specPath: "docs/legacy-spec.md",
+          },
+        },
+      }),
+    );
+
+    expect(next.cards[0]).toBeDefined();
+    expect("specPath" in next.cards[0]!).toBe(false);
   });
 
   it("upserts tasks by card id and task id so different cards can share task ids", async () => {

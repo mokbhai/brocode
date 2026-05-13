@@ -3,7 +3,6 @@ import type {
   KanbanReview,
   KanbanRun,
   KanbanTask,
-  KanbanTaskStatus,
   RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
@@ -36,19 +35,13 @@ import {
   GitForkIcon,
   ListChecksIcon,
   MessageCircleIcon,
-  PlusIcon,
   PlayIcon,
   RefreshCwIcon,
   SquarePenIcon,
-  XIcon,
 } from "~/lib/icons";
 
 import { getKanbanCardStatusTitle } from "../../kanbanStatus";
-import type {
-  DeleteKanbanTaskInput,
-  UpdateKanbanCardInput,
-  UpsertKanbanTaskInput,
-} from "../../kanbanStore";
+import type { UpdateKanbanCardInput } from "../../kanbanStore";
 import { createKanbanCardViewModel } from "./kanbanBoard.logic";
 
 export interface KanbanCardDetailPanelProps {
@@ -63,8 +56,6 @@ export interface KanbanCardDetailPanelProps {
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCard) => void;
   readonly onStartRun?: (card: KanbanCard) => void;
   readonly onUpdateCard?: (input: UpdateKanbanCardInput) => Promise<void> | void;
-  readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
-  readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
 }
 
 function formatDateTime(value: string): string {
@@ -104,21 +95,10 @@ function reviewBadgeVariant(outcome: KanbanReview["outcome"]) {
   }
 }
 
-const TASK_STATUS_LABELS: Record<KanbanTaskStatus, string> = {
-  todo: "Todo",
-  in_progress: "In progress",
-  done: "Done",
-  blocked: "Blocked",
-};
-
 const RUNTIME_MODE_LABELS: Record<RuntimeMode, string> = {
   "full-access": "Full access",
   "approval-required": "Approval required",
 };
-
-function isKanbanTaskStatus(value: string): value is KanbanTaskStatus {
-  return value === "todo" || value === "in_progress" || value === "done" || value === "blocked";
-}
 
 function isRuntimeMode(value: string): value is RuntimeMode {
   return value === "full-access" || value === "approval-required";
@@ -156,54 +136,31 @@ export function KanbanCardDetailPanel({
   onOpenReviewerThread,
   onStartRun,
   onUpdateCard,
-  onUpsertTask,
-  onDeleteTask,
 }: KanbanCardDetailPanelProps) {
   const viewModel = card ? createKanbanCardViewModel(card, tasks) : null;
   const [editingCard, setEditingCard] = useState(false);
   const [cardTitle, setCardTitle] = useState("");
   const [cardDescription, setCardDescription] = useState("");
-  const [cardSpecPath, setCardSpecPath] = useState("");
   const [cardRuntimeMode, setCardRuntimeMode] = useState<RuntimeMode>("full-access");
   const [cardError, setCardError] = useState<string | null>(null);
   const [cardSubmitting, setCardSubmitting] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<KanbanTask["id"] | "new" | null>(null);
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDescription, setTaskDescription] = useState("");
-  const [taskStatus, setTaskStatus] = useState<KanbanTaskStatus>("todo");
-  const [taskError, setTaskError] = useState<string | null>(null);
-  const [taskSubmitting, setTaskSubmitting] = useState(false);
-  const [deletingTaskId, setDeletingTaskId] = useState<KanbanTask["id"] | null>(null);
   const cardTitleInputId = "kanban-card-title-input";
   const cardDescriptionInputId = "kanban-card-description-input";
-  const cardSpecPathInputId = "kanban-card-spec-path-input";
   const cardErrorId = "kanban-card-form-error";
-  const taskTitleInputId = "kanban-task-title-input";
-  const taskDescriptionInputId = "kanban-task-description-input";
-  const taskErrorId = "kanban-task-form-error";
 
   useEffect(() => {
     setEditingCard(false);
     setCardTitle(card?.title ?? "");
     setCardDescription(card?.description ?? "");
-    setCardSpecPath(card?.specPath ?? "");
     setCardRuntimeMode(card?.runtimeMode ?? "full-access");
     setCardError(null);
     setCardSubmitting(false);
-    setEditingTaskId(null);
-    setTaskTitle("");
-    setTaskDescription("");
-    setTaskStatus("todo");
-    setTaskError(null);
-    setTaskSubmitting(false);
-    setDeletingTaskId(null);
   }, [card?.id, open]);
 
   const resetCardForm = () => {
     setEditingCard(false);
     setCardTitle(card?.title ?? "");
     setCardDescription(card?.description ?? "");
-    setCardSpecPath(card?.specPath ?? "");
     setCardRuntimeMode(card?.runtimeMode ?? "full-access");
     setCardError(null);
   };
@@ -212,7 +169,6 @@ export function KanbanCardDetailPanel({
     setEditingCard(true);
     setCardTitle(card?.title ?? "");
     setCardDescription(card?.description ?? "");
-    setCardSpecPath(card?.specPath ?? "");
     setCardRuntimeMode(card?.runtimeMode ?? "full-access");
     setCardError(null);
   };
@@ -234,7 +190,6 @@ export function KanbanCardDetailPanel({
         cardId: card.id,
         title,
         description: cardDescription.trim() || null,
-        specPath: cardSpecPath.trim() || null,
         runtimeMode: cardRuntimeMode,
       });
       setEditingCard(false);
@@ -242,88 +197,6 @@ export function KanbanCardDetailPanel({
       setCardError(error instanceof Error ? error.message : String(error));
     } finally {
       setCardSubmitting(false);
-    }
-  };
-
-  const resetTaskForm = () => {
-    setEditingTaskId(null);
-    setTaskTitle("");
-    setTaskDescription("");
-    setTaskStatus("todo");
-    setTaskError(null);
-  };
-
-  const startAddingTask = () => {
-    setEditingTaskId("new");
-    setTaskTitle("");
-    setTaskDescription("");
-    setTaskStatus("todo");
-    setTaskError(null);
-  };
-
-  const startEditingTask = (task: KanbanTask) => {
-    setEditingTaskId(task.id);
-    setTaskTitle(task.title);
-    setTaskDescription(task.description ?? "");
-    setTaskStatus(task.status);
-    setTaskError(null);
-  };
-
-  const submitTask = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!card || !onUpsertTask || taskSubmitting) {
-      return;
-    }
-    const title = taskTitle.trim();
-    if (!title) {
-      setTaskError("Task title is required");
-      return;
-    }
-    const existingTask =
-      editingTaskId && editingTaskId !== "new"
-        ? tasks.find((task) => task.id === editingTaskId)
-        : null;
-    if (editingTaskId && editingTaskId !== "new" && !existingTask) {
-      setTaskError("Task no longer exists");
-      return;
-    }
-    setTaskSubmitting(true);
-    setTaskError(null);
-    try {
-      await onUpsertTask({
-        cardId: card.id,
-        ...(existingTask ? { taskId: existingTask.id } : {}),
-        title,
-        ...(taskDescription.trim() ? { description: taskDescription.trim() } : {}),
-        status: taskStatus,
-        order: existingTask?.order ?? tasks.length,
-      });
-      resetTaskForm();
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setTaskSubmitting(false);
-    }
-  };
-
-  const deleteTask = async (task: KanbanTask) => {
-    if (!card || !onDeleteTask || deletingTaskId) {
-      return;
-    }
-    setDeletingTaskId(task.id);
-    setTaskError(null);
-    try {
-      await onDeleteTask({
-        cardId: card.id,
-        taskId: task.id,
-      });
-      if (editingTaskId === task.id) {
-        resetTaskForm();
-      }
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setDeletingTaskId(null);
     }
   };
 
@@ -469,19 +342,6 @@ export function KanbanCardDetailPanel({
                       onChange={(event) => setCardDescription(event.currentTarget.value)}
                       placeholder="Optional context"
                     />
-                    <label
-                      className="block text-xs font-medium text-foreground"
-                      htmlFor={cardSpecPathInputId}
-                    >
-                      Spec path
-                    </label>
-                    <Input
-                      id={cardSpecPathInputId}
-                      value={cardSpecPath}
-                      onChange={(event) => setCardSpecPath(event.currentTarget.value)}
-                      placeholder="docs/specs/kanban-task.md"
-                      nativeInput
-                    />
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <Select
                         value={cardRuntimeMode}
@@ -525,7 +385,6 @@ export function KanbanCardDetailPanel({
                 ) : (
                   <dl className="space-y-2 rounded-md border border-[color:var(--color-border-light)] p-3">
                     <DetailRow label="Status" value={getKanbanCardStatusTitle(card.status)} />
-                    <DetailRow label="Spec" value={card.specPath} />
                     <DetailRow
                       label="Model"
                       value={`${card.modelSelection.provider} / ${card.modelSelection.model}`}
@@ -544,86 +403,7 @@ export function KanbanCardDetailPanel({
               <section className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium text-foreground">Tasks</h3>
-                  {onUpsertTask ? (
-                    <Button size="sm" variant="outline" onClick={startAddingTask}>
-                      <PlusIcon />
-                      Add task
-                    </Button>
-                  ) : null}
                 </div>
-                {editingTaskId ? (
-                  <form
-                    className="space-y-2 rounded-md border border-[color:var(--color-border-light)] bg-muted/16 p-3"
-                    onSubmit={submitTask}
-                  >
-                    <label
-                      className="block text-xs font-medium text-foreground"
-                      htmlFor={taskTitleInputId}
-                    >
-                      Task title
-                    </label>
-                    <Input
-                      id={taskTitleInputId}
-                      value={taskTitle}
-                      onChange={(event) => setTaskTitle(event.currentTarget.value)}
-                      placeholder="Task title"
-                      nativeInput
-                      aria-invalid={taskError ? true : undefined}
-                      aria-describedby={taskError ? taskErrorId : undefined}
-                    />
-                    <label
-                      className="block text-xs font-medium text-foreground"
-                      htmlFor={taskDescriptionInputId}
-                    >
-                      Task notes
-                    </label>
-                    <Textarea
-                      id={taskDescriptionInputId}
-                      value={taskDescription}
-                      onChange={(event) => setTaskDescription(event.currentTarget.value)}
-                      placeholder="Optional task notes"
-                    />
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Select
-                        value={taskStatus}
-                        onValueChange={(value) => {
-                          if (isKanbanTaskStatus(value)) {
-                            setTaskStatus(value);
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-40" aria-label="Task status">
-                          <SelectValue>{TASK_STATUS_LABELS[taskStatus]}</SelectValue>
-                        </SelectTrigger>
-                        <SelectPopup>
-                          {Object.entries(TASK_STATUS_LABELS).map(([status, label]) => (
-                            <SelectItem hideIndicator key={status} value={status}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectPopup>
-                      </Select>
-                      <div className="flex items-center gap-2">
-                        <Button type="button" size="sm" variant="ghost" onClick={resetTaskForm}>
-                          Cancel
-                        </Button>
-                        <Button type="submit" size="sm" disabled={taskSubmitting}>
-                          Save task
-                        </Button>
-                      </div>
-                    </div>
-                  </form>
-                ) : null}
-                {taskError ? (
-                  <div
-                    id={taskErrorId}
-                    role="alert"
-                    aria-live="polite"
-                    className="rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive-foreground"
-                  >
-                    {taskError}
-                  </div>
-                ) : null}
                 {tasks.length > 0 ? (
                   <div className="space-y-2">
                     {tasks.map((task) => (
@@ -651,31 +431,6 @@ export function KanbanCardDetailPanel({
                         <Badge size="sm" variant={task.status === "blocked" ? "error" : "outline"}>
                           {task.status.replaceAll("_", " ")}
                         </Badge>
-                        {onUpsertTask ? (
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={`Edit ${task.title}`}
-                            title="Edit task"
-                            onClick={() => startEditingTask(task)}
-                          >
-                            <SquarePenIcon />
-                          </Button>
-                        ) : null}
-                        {onDeleteTask ? (
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={`Delete ${task.title}`}
-                            title="Delete task"
-                            disabled={deletingTaskId === task.id}
-                            onClick={() => {
-                              void deleteTask(task);
-                            }}
-                          >
-                            <XIcon />
-                          </Button>
-                        ) : null}
                       </div>
                     ))}
                   </div>

@@ -2,36 +2,22 @@ import {
   DEFAULT_MODEL_BY_PROVIDER,
   DEFAULT_RUNTIME_MODE,
   type KanbanBoardId,
-  type KanbanTaskStatus,
   type ModelSelection,
   type ProjectId,
   type RuntimeMode,
   type ThreadId,
 } from "@t3tools/contracts";
 
-import type { CreateKanbanCardInput, CreateKanbanCardTaskInput } from "../../kanbanStore";
-
-export type KanbanCreateCardMode = "thread" | "specPath" | "manual";
-
-export interface KanbanCreateCardTaskDraft {
-  readonly title: string;
-  readonly description?: string;
-  readonly status?: KanbanTaskStatus;
-}
+import type { CreateKanbanCardInput } from "../../kanbanStore";
 
 export interface BuildCreateKanbanCardInputOptions {
   readonly boardId: KanbanBoardId;
   readonly projectId: ProjectId;
-  readonly mode: KanbanCreateCardMode;
   readonly title: string;
   readonly description?: string;
-  readonly specPath?: string;
-  readonly inlineSpec?: string;
-  readonly sourceThreadId?: ThreadId | null;
-  readonly modelSelection?: ModelSelection | null;
   readonly runtimeMode?: RuntimeMode | null;
-  readonly tasks?: readonly KanbanCreateCardTaskDraft[];
-  readonly tasksText?: string;
+  readonly modelSelection?: ModelSelection | null;
+  readonly sourceThreadId?: ThreadId | null;
 }
 
 function trimRequired(value: string | null | undefined, fieldName: string): string {
@@ -54,90 +40,19 @@ export function createDefaultKanbanModelSelection(): ModelSelection {
   };
 }
 
-export function parseKanbanInitialTasks(text: string): CreateKanbanCardTaskInput[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^[-*]\s+/, ""))
-    .filter(Boolean)
-    .map((title, order) => ({
-      title,
-      status: "todo" as const,
-      order,
-    }));
-}
-
-function normalizeTasks(
-  tasks: readonly KanbanCreateCardTaskDraft[] | undefined,
-  tasksText: string | undefined,
-): CreateKanbanCardTaskInput[] {
-  if (tasks) {
-    return tasks
-      .map((task, order) => {
-        const title = optionalTrimmed(task.title);
-        if (!title) {
-          return null;
-        }
-        return {
-          title,
-          ...(optionalTrimmed(task.description)
-            ? { description: optionalTrimmed(task.description) }
-            : {}),
-          status: task.status ?? "todo",
-          order,
-        } satisfies CreateKanbanCardTaskInput;
-      })
-      .filter((task): task is CreateKanbanCardTaskInput => task !== null);
-  }
-
-  return parseKanbanInitialTasks(tasksText ?? "");
-}
-
 export function buildCreateKanbanCardInput(
   options: BuildCreateKanbanCardInputOptions,
 ): CreateKanbanCardInput {
   const title = trimRequired(options.title, "Title");
-  const modelSelection = options.modelSelection ?? createDefaultKanbanModelSelection();
-  const runtimeMode = options.runtimeMode ?? DEFAULT_RUNTIME_MODE;
-  const tasks = normalizeTasks(options.tasks, options.tasksText);
   const description = optionalTrimmed(options.description);
 
-  if (options.mode === "manual") {
-    const specPath = optionalTrimmed(options.specPath);
-    const inlineSpec = optionalTrimmed(options.inlineSpec);
-    const manualDescription = inlineSpec
-      ? description
-        ? `${description}\n\nInline spec:\n\n${inlineSpec}`
-        : `Inline spec:\n\n${inlineSpec}`
-      : description;
-    return {
-      boardId: options.boardId,
-      projectId: options.projectId,
-      sourceThreadId: null,
-      title,
-      ...(manualDescription ? { description: manualDescription } : {}),
-      ...(specPath ? { specPath } : {}),
-      tasks,
-      modelSelection,
-      runtimeMode,
-    };
-  }
-
-  const specPath =
-    options.mode === "specPath"
-      ? trimRequired(options.specPath, "Spec path")
-      : optionalTrimmed(options.specPath);
   return {
     boardId: options.boardId,
     projectId: options.projectId,
-    sourceThreadId:
-      options.mode === "thread"
-        ? (trimRequired(options.sourceThreadId, "Source thread") as ThreadId)
-        : null,
+    sourceThreadId: options.sourceThreadId ?? null,
     title,
     ...(description ? { description } : {}),
-    ...(specPath ? { specPath } : {}),
-    tasks,
-    modelSelection,
-    runtimeMode,
+    modelSelection: options.modelSelection ?? createDefaultKanbanModelSelection(),
+    runtimeMode: options.runtimeMode ?? DEFAULT_RUNTIME_MODE,
   };
 }

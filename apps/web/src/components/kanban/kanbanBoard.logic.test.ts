@@ -30,7 +30,6 @@ function makeCard(overrides: Partial<KanbanCard> = {}): KanbanCard {
     reviewerThreadIds: [],
     title: "Implement Kanban board",
     description: "Add the board presentation logic",
-    specPath: "docs/spec.md",
     status: "ready",
     modelSelection: {
       provider: "codex",

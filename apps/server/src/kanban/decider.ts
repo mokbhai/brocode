@@ -156,27 +156,6 @@ function statusChangedEvent(input: {
   };
 }
 
-function buildTask(input: {
-  readonly command: Extract<KanbanCommand, { readonly type: "kanban.card.create" }>;
-  readonly taskInput: Extract<
-    KanbanCommand,
-    { readonly type: "kanban.card.create" }
-  >["tasks"][number];
-}): KanbanTask {
-  return {
-    id: input.taskInput.taskId,
-    cardId: input.command.cardId,
-    title: input.taskInput.title,
-    ...(input.taskInput.description !== undefined
-      ? { description: input.taskInput.description }
-      : {}),
-    status: input.taskInput.status,
-    order: input.taskInput.order,
-    createdAt: input.command.createdAt,
-    updatedAt: input.command.createdAt,
-  };
-}
-
 function buildCard(
   command: Extract<KanbanCommand, { readonly type: "kanban.card.create" }>,
 ): KanbanCard {
@@ -189,15 +168,14 @@ function buildCard(
     reviewerThreadIds: [],
     title: command.title,
     ...(command.description !== undefined ? { description: command.description } : {}),
-    ...(command.specPath !== undefined ? { specPath: command.specPath } : {}),
     status: "draft",
     modelSelection: command.modelSelection,
     runtimeMode: command.runtimeMode,
-    branch: command.branch ?? null,
-    worktreePath: command.worktreePath ?? null,
-    associatedWorktreePath: command.associatedWorktreePath ?? null,
-    associatedWorktreeBranch: command.associatedWorktreeBranch ?? null,
-    associatedWorktreeRef: command.associatedWorktreeRef ?? null,
+    branch: null,
+    worktreePath: null,
+    associatedWorktreePath: null,
+    associatedWorktreeBranch: null,
+    associatedWorktreeRef: null,
     blockerReason: null,
     loopCount: 0,
     maxLoopCount: DEFAULT_MAX_LOOP_COUNT,
@@ -222,16 +200,24 @@ function buildUpdatedCard(
       next.description = command.description;
     }
   }
-  if (command.specPath !== undefined) {
-    if (command.specPath === null) {
-      delete next.specPath;
-    } else {
-      next.specPath = command.specPath;
-    }
-  }
   if (command.modelSelection !== undefined) next.modelSelection = command.modelSelection;
   if (command.runtimeMode !== undefined) next.runtimeMode = command.runtimeMode;
   return next;
+}
+
+function buildWorktreeUpdatedCard(
+  card: KanbanCard,
+  command: Extract<KanbanCommand, { readonly type: "kanban.card.worktree.set" }>,
+): KanbanCard {
+  return {
+    ...card,
+    branch: command.branch ?? null,
+    worktreePath: command.worktreePath ?? null,
+    associatedWorktreePath: command.associatedWorktreePath ?? null,
+    associatedWorktreeBranch: command.associatedWorktreeBranch ?? null,
+    associatedWorktreeRef: command.associatedWorktreeRef ?? null,
+    updatedAt: command.updatedAt,
+  };
 }
 
 function buildUpsertedTask(input: {
@@ -332,7 +318,7 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
         type: "kanban.card.created",
         payload: {
           card,
-          tasks: command.tasks.map((taskInput) => buildTask({ command, taskInput })),
+          tasks: [],
         },
       };
     }
@@ -363,6 +349,22 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
         reason: command.reason ?? null,
         updatedAt: command.updatedAt,
       });
+    }
+
+    case "kanban.card.worktree.set": {
+      const card = yield* requireCard(command, readModel, command.cardId);
+      return {
+        ...eventBase({
+          aggregateKind: "card",
+          aggregateId: command.cardId,
+          occurredAt: command.updatedAt,
+          commandId: command.commandId,
+        }),
+        type: "kanban.card.updated",
+        payload: {
+          card: buildWorktreeUpdatedCard(card, command),
+        },
+      };
     }
 
     case "kanban.task.upsert": {

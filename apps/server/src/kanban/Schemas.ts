@@ -1,10 +1,10 @@
 import {
   IsoDateTime,
   KanbanBoard,
-  KanbanCard,
   KanbanCardId,
   KanbanCardStatus,
   KanbanCompletedRun,
+  KanbanEventCard,
   KanbanReview,
   KanbanRun,
   KanbanTask,
@@ -21,12 +21,12 @@ export const KanbanBoardCreatedPayload = Schema.Struct({
 });
 
 export const KanbanCardCreatedPayload = Schema.Struct({
-  card: KanbanCard,
+  card: KanbanEventCard,
   tasks: Schema.Array(KanbanTask),
 });
 
 export const KanbanCardUpdatedPayload = Schema.Struct({
-  card: KanbanCard,
+  card: KanbanEventCard,
 });
 
 export const KanbanCardStatusChangedPayload = Schema.Struct({

@@ -95,7 +95,7 @@ describe("KanbanProjectionPipeline", () => {
       reviewerThreadIds: [],
       title: "Projection Card",
       description: "Projected card",
-      specPath: "docs/projection.md",
+      specPath: "docs/legacy-projection.md",
       status: "draft" as const,
       modelSelection: {
         provider: "codex",
@@ -174,18 +174,20 @@ describe("KanbanProjectionPipeline", () => {
     const cards = await system.run(
       system.sql<{
         readonly cardId: string;
+        readonly specPath: string | null;
         readonly status: string;
         readonly modelSelectionJson: string;
       }>`
         SELECT
           card_id AS "cardId",
+          spec_path AS "specPath",
           status,
           model_selection_json AS "modelSelectionJson"
         FROM projection_kanban_cards
       `,
     );
     expect(cards).toHaveLength(1);
-    expect(cards[0]).toMatchObject({ cardId, status: "ready" });
+    expect(cards[0]).toMatchObject({ cardId, specPath: null, status: "ready" });
     expect(JSON.parse(cards[0]!.modelSelectionJson)).toEqual({
       provider: "codex",
       model: "gpt-5-codex",
@@ -355,7 +357,6 @@ describe("KanbanProjectionPipeline", () => {
       workerThreadIds: [],
       reviewerThreadIds: [],
       title,
-      specPath: "docs/composite-task.md",
       status: "draft" as const,
       modelSelection: {
         provider: "codex",

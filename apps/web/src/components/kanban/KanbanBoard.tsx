@@ -17,13 +17,7 @@ import { KanbanCard } from "./KanbanCard";
 import { KanbanCreateCardDialog } from "./KanbanCreateCardDialog";
 import { KanbanCardDetailPanel } from "./KanbanCardDetailPanel";
 import { groupKanbanCardsByColumn } from "./kanbanBoard.logic";
-import type {
-  CreateKanbanCardInput,
-  DeleteKanbanTaskInput,
-  UpdateKanbanCardInput,
-  UpsertKanbanTaskInput,
-} from "../../kanbanStore";
-import type { KanbanCreateCardMode } from "./kanbanCreateCard.logic";
+import type { CreateKanbanCardInput, UpdateKanbanCardInput } from "../../kanbanStore";
 
 export interface KanbanBoardProps {
   readonly snapshot: KanbanBoardSnapshot;
@@ -35,10 +29,7 @@ export interface KanbanBoardProps {
   readonly onOpenReviewerThread?: (threadId: ThreadId, card: KanbanCardRecord) => void;
   readonly onStartRun?: (card: KanbanCardRecord) => void;
   readonly onUpdateCard?: (input: UpdateKanbanCardInput) => Promise<void> | void;
-  readonly onUpsertTask?: (input: UpsertKanbanTaskInput) => Promise<void> | void;
-  readonly onDeleteTask?: (input: DeleteKanbanTaskInput) => Promise<void> | void;
   readonly initialCreateCardOpen?: boolean;
-  readonly initialCreateCardMode?: KanbanCreateCardMode;
   readonly initialCreateCardSourceThreadId?: ThreadId | null;
   readonly initialCreateCardTitle?: string;
   readonly initialCreateCardModelSelection?: ModelSelection | null;
@@ -55,10 +46,7 @@ export function KanbanBoard({
   onOpenReviewerThread,
   onStartRun,
   onUpdateCard,
-  onUpsertTask,
-  onDeleteTask,
   initialCreateCardOpen = false,
-  initialCreateCardMode,
   initialCreateCardSourceThreadId = null,
   initialCreateCardTitle,
   initialCreateCardModelSelection = null,
@@ -173,8 +161,6 @@ export function KanbanBoard({
         onOpenReviewerThread={onOpenReviewerThread}
         onStartRun={onStartRun}
         onUpdateCard={onUpdateCard}
-        onUpsertTask={onUpsertTask}
-        onDeleteTask={onDeleteTask}
       />
 
       {onCreateCard ? (
@@ -183,7 +169,6 @@ export function KanbanBoard({
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onCreateCard={onCreateCard}
-          initialMode={initialCreateCardMode}
           initialSourceThreadId={initialCreateCardSourceThreadId}
           initialTitle={initialCreateCardTitle}
           initialModelSelection={initialCreateCardModelSelection}

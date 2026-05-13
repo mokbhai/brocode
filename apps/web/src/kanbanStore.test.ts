@@ -1,5 +1,4 @@
 import {
-  ClientKanbanCommand,
   type EventId,
   type KanbanBoard,
   type KanbanBoardId,
@@ -12,7 +11,6 @@ import {
   type ProjectId,
   type ThreadId,
 } from "@t3tools/contracts";
-import { Schema } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -28,7 +26,6 @@ const cardId = "card-1" as KanbanCardId;
 const taskId = "task-1" as KanbanTaskId;
 const projectId = "project-1" as ProjectId;
 const now = "2026-05-12T00:00:00.000Z";
-const decodeClientKanbanCommand = Schema.decodeUnknownSync(ClientKanbanCommand);
 
 function makeBoard(overrides: Partial<KanbanBoard> = {}): KanbanBoard {
   return {
@@ -51,7 +48,6 @@ function makeCard(overrides: Partial<KanbanCard> = {}): KanbanCard {
     reviewerThreadIds: [],
     title: "Implement store",
     description: "Add the Kanban store",
-    specPath: "docs/spec.md",
     status: "ready",
     modelSelection: {
       provider: "codex",
@@ -299,6 +295,22 @@ describe("kanbanStore state", () => {
     expect(afterBlocked.cards[0]?.blockerReason).toBe("Needs product decision");
   });
 
+  it("strips legacy specPath from streamed card events before updating snapshots", () => {
+    const snapshot = makeSnapshot();
+    const next = applyKanbanEventToSnapshot(
+      snapshot,
+      makeEvent("kanban.card.updated", {
+        card: {
+          ...makeCard({ title: "Updated from legacy event" }),
+          specPath: "docs/legacy-spec.md",
+        },
+      }),
+    );
+
+    expect(next.cards[0]?.title).toBe("Updated from legacy event");
+    expect("specPath" in next.cards[0]!).toBe(false);
+  });
+
   it("ignores card events that do not belong to the snapshot", () => {
     const snapshot = makeSnapshot();
 
@@ -419,7 +431,7 @@ describe("kanbanStore state", () => {
     expect(useKanbanStore.getState().removeBoardEventListenerByBoardId[boardId]).toBeUndefined();
   });
 
-  it("dispatches create-card, card-update, and task commands through the native Kanban API", async () => {
+  it("dispatches create-card and card-update commands without public task or worktree inputs", async () => {
     dispatchCommand.mockResolvedValue({ sequence: 4 });
 
     await useKanbanStore.getState().createKanbanBoard({
@@ -433,7 +445,6 @@ describe("kanbanStore state", () => {
       projectId,
       sourceThreadId: "thread-1" as ThreadId,
       title: "Implement Kanban UI",
-      tasks: [{ taskId, title: "Create board", status: "todo", order: 0 }],
       modelSelection: { provider: "codex", model: "gpt-5-codex" },
       runtimeMode: "full-access",
     });
@@ -441,24 +452,10 @@ describe("kanbanStore state", () => {
       cardId,
       title: "Implement Kanban board UI",
       description: null,
-      specPath: null,
       runtimeMode: "approval-required",
     });
-    await useKanbanStore.getState().upsertKanbanTask({
-      cardId,
-      taskId,
-      title: "Create detail panel",
-      status: "in_progress",
-      order: 1,
-    });
-    await useKanbanStore.getState().deleteKanbanTask({
-      cardId,
-      taskId,
-    });
 
-    const commands = dispatchCommand.mock.calls.map(([command]) =>
-      decodeClientKanbanCommand(command),
-    );
+    const commands = dispatchCommand.mock.calls.map(([command]) => command);
     expect(commands[0]).toMatchObject({
       type: "kanban.board.create",
       boardId,
@@ -473,39 +470,28 @@ describe("kanbanStore state", () => {
       title: "Implement Kanban UI",
       sourceThreadId: "thread-1",
     });
-    expect(
-      commands[1]?.type === "kanban.card.create" ? commands[1].specPath : null,
-    ).toBeUndefined();
-    expect(commands[1]?.type === "kanban.card.create" ? commands[1].tasks : []).toEqual([
-      {
-        taskId,
-        title: "Create board",
-        status: "todo",
-        order: 0,
-      },
-    ]);
+    expect(commands[1]).not.toHaveProperty("tasks");
+    expect(commands[1]).not.toHaveProperty("specPath");
+    expect(commands[1]).not.toHaveProperty("branch");
+    expect(commands[1]).not.toHaveProperty("worktreePath");
+    expect(commands[1]).not.toHaveProperty("associatedWorktreePath");
+    expect(commands[1]).not.toHaveProperty("associatedWorktreeBranch");
+    expect(commands[1]).not.toHaveProperty("associatedWorktreeRef");
     expect(commands[2]).toMatchObject({
       type: "kanban.card.update",
       cardId,
       title: "Implement Kanban board UI",
       description: null,
-      specPath: null,
       runtimeMode: "approval-required",
     });
-    expect(commands[3]).toMatchObject({
-      type: "kanban.task.upsert",
-      cardId,
-      task: {
-        taskId,
-        title: "Create detail panel",
-        status: "in_progress",
-        order: 1,
-      },
-    });
-    expect(commands[4]).toMatchObject({
-      type: "kanban.task.delete",
-      cardId,
-      taskId,
-    });
+    expect(commands[2]).not.toHaveProperty("specPath");
+    expect(dispatchCommand).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not expose public task mutation actions from the web store", () => {
+    const state = useKanbanStore.getState();
+
+    expect(state).not.toHaveProperty("upsertKanbanTask");
+    expect(state).not.toHaveProperty("deleteKanbanTask");
   });
 });
