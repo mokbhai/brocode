@@ -5,6 +5,7 @@ import type { Effect, Stream } from "effect";
 import type {
   OrchestrationCommandReceiptRepositoryError,
   OrchestrationEventStoreError,
+  ProjectionRepositoryError,
 } from "../../persistence/Errors.ts";
 import type { AutomationCommandInvariantError } from "../decider.ts";
 import type { AutomationProjectorDecodeError } from "../projector.ts";
@@ -40,7 +41,8 @@ export type AutomationDispatchError =
   | AutomationCommandInternalError
   | AutomationProjectorDecodeError
   | OrchestrationCommandReceiptRepositoryError
-  | OrchestrationEventStoreError;
+  | OrchestrationEventStoreError
+  | ProjectionRepositoryError;
 
 export interface AutomationEngineShape {
   readonly getReadModel: () => Effect.Effect<AutomationReadModel>;

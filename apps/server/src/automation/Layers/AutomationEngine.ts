@@ -19,6 +19,7 @@ import {
   type AutomationDispatchError,
   type AutomationEngineShape,
 } from "../Services/AutomationEngine.ts";
+import { AutomationProjectionPipeline } from "../Services/AutomationProjectionPipeline.ts";
 
 interface CommandEnvelope {
   readonly command: AutomationCommand;
@@ -54,6 +55,7 @@ function commandToAggregateRef(command: AutomationCommand): {
 const makeAutomationEngine = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const eventStore = yield* AutomationEventStore;
+  const projectionPipeline = yield* AutomationProjectionPipeline;
 
   let readModel = createEmptyAutomationReadModel(new Date().toISOString());
   const commandQueue = yield* Queue.unbounded<CommandEnvelope>();
@@ -95,6 +97,7 @@ const makeAutomationEngine = Effect.gen(function* () {
       const existingReceipt = yield* eventStore.getCommandReceipt(envelope.command.commandId);
       if (Option.isSome(existingReceipt)) {
         if (existingReceipt.value.status === "accepted") {
+          yield* projectionPipeline.bootstrap;
           yield* Deferred.succeed(envelope.result, {
             sequence: existingReceipt.value.resultSequence,
           });
@@ -161,6 +164,9 @@ const makeAutomationEngine = Effect.gen(function* () {
           ),
         );
 
+      for (const event of committedCommand.committedEvents) {
+        yield* projectionPipeline.projectEvent(event);
+      }
       readModel = committedCommand.nextReadModel;
       for (const event of committedCommand.committedEvents) {
         yield* PubSub.publish(eventPubSub, event);
@@ -188,6 +194,8 @@ const makeAutomationEngine = Effect.gen(function* () {
         );
       }),
     );
+
+  yield* projectionPipeline.bootstrap;
 
   yield* Stream.runForEach(eventStore.readAll(), (event) =>
     Effect.gen(function* () {
