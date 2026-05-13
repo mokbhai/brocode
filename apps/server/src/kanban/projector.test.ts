@@ -177,6 +177,61 @@ describe("projectKanbanEvent", () => {
     expect("specPath" in next.cards[0]!).toBe(false);
   });
 
+  it("preserves server-owned worktree metadata from card updates", async () => {
+    const initial = createEmptyKanbanReadModel("2026-05-12T00:00:00.000Z");
+    const afterCard = await Effect.runPromise(projectKanbanEvent(initial, cardCreated));
+    const next = await Effect.runPromise(
+      projectKanbanEvent(afterCard, {
+        ...eventBase(3, "kanban.card.updated"),
+        type: "kanban.card.updated",
+        payload: {
+          card: {
+            ...cardCreated.payload.card,
+            branch: "kanban/card-1",
+            worktreePath: "/tmp/card-1",
+            associatedWorktreePath: "/repo",
+            associatedWorktreeBranch: "main",
+            associatedWorktreeRef: "abc123",
+            updatedAt: "2026-05-12T00:00:03.000Z",
+          },
+        },
+      }),
+    );
+
+    expect(next.cards[0]).toMatchObject({
+      branch: "kanban/card-1",
+      worktreePath: "/tmp/card-1",
+      associatedWorktreePath: "/repo",
+      associatedWorktreeBranch: "main",
+      associatedWorktreeRef: "abc123",
+      updatedAt: "2026-05-12T00:00:03.000Z",
+    });
+  });
+
+  it("preserves the visible reason for agent error status changes", async () => {
+    const initial = createEmptyKanbanReadModel("2026-05-12T00:00:00.000Z");
+    const afterCard = await Effect.runPromise(projectKanbanEvent(initial, cardCreated));
+    const next = await Effect.runPromise(
+      projectKanbanEvent(afterCard, {
+        ...eventBase(3, "kanban.card.status-changed"),
+        type: "kanban.card.status-changed",
+        payload: {
+          cardId,
+          fromStatus: "implementing",
+          toStatus: "agent_error",
+          reason: "Worker summary was malformed",
+          updatedAt: "2026-05-12T00:00:03.000Z",
+        },
+      }),
+    );
+
+    expect(next.cards[0]).toMatchObject({
+      status: "agent_error",
+      blockerReason: "Worker summary was malformed",
+      updatedAt: "2026-05-12T00:00:03.000Z",
+    });
+  });
+
   it("upserts tasks by card id and task id so different cards can share task ids", async () => {
     const initial = {
       ...createEmptyKanbanReadModel("2026-05-12T00:00:00.000Z"),

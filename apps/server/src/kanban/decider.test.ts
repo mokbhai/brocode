@@ -367,6 +367,148 @@ describe("decideKanbanCommand", () => {
     });
   });
 
+  it("moves an implementing card to reviewing before recording a successful worker run", async () => {
+    const result = await runDecision(
+      {
+        type: "kanban.run.complete",
+        commandId: CommandId.makeUnsafe("cmd_worker_complete"),
+        runId: KanbanRunId.makeUnsafe("run_worker"),
+        cardId,
+        status: "completed",
+        completedAt: now,
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("implementing")],
+        runs: [
+          {
+            id: KanbanRunId.makeUnsafe("run_worker"),
+            cardId,
+            role: "worker",
+            status: "running",
+            threadId: ThreadId.makeUnsafe("thread_worker_1"),
+            startedAt: now,
+          },
+        ],
+      },
+    );
+
+    const events = asEvents(result);
+    expect(events.map((event) => event.type)).toEqual([
+      "kanban.card.status-changed",
+      "kanban.run.completed",
+    ]);
+    expect(events[0]?.payload).toMatchObject({
+      cardId,
+      fromStatus: "implementing",
+      toStatus: "reviewing",
+      reason: null,
+    });
+    expect(events[1]?.payload).toMatchObject({
+      run: {
+        id: KanbanRunId.makeUnsafe("run_worker"),
+        status: "completed",
+      },
+    });
+  });
+
+  it.each([
+    {
+      status: "failed" as const,
+      errorMessage: "Worker summary was malformed",
+      expectedReason: "Worker summary was malformed",
+    },
+    {
+      status: "interrupted" as const,
+      errorMessage: undefined,
+      expectedReason: "Worker run interrupted",
+    },
+  ])(
+    "moves an implementing card to agent_error before recording a $status worker run",
+    async ({ status, errorMessage, expectedReason }) => {
+      const result = await runDecision(
+        {
+          type: "kanban.run.complete",
+          commandId: CommandId.makeUnsafe(`cmd_worker_${status}`),
+          runId: KanbanRunId.makeUnsafe(`run_worker_${status}`),
+          cardId,
+          status,
+          ...(errorMessage !== undefined ? { errorMessage } : {}),
+          completedAt: now,
+        },
+        {
+          ...readModelWithBoard(),
+          cards: [readyCard("implementing")],
+          runs: [
+            {
+              id: KanbanRunId.makeUnsafe(`run_worker_${status}`),
+              cardId,
+              role: "worker",
+              status: "running",
+              threadId: ThreadId.makeUnsafe("thread_worker_1"),
+              startedAt: now,
+            },
+          ],
+        },
+      );
+
+      const events = asEvents(result);
+      expect(events.map((event) => event.type)).toEqual([
+        "kanban.card.status-changed",
+        "kanban.run.completed",
+      ]);
+      expect(events[0]?.payload).toMatchObject({
+        cardId,
+        fromStatus: "implementing",
+        toStatus: "agent_error",
+        reason: expectedReason,
+      });
+      expect(events[1]?.payload).toMatchObject({
+        run: {
+          id: KanbanRunId.makeUnsafe(`run_worker_${status}`),
+          status,
+          ...(errorMessage !== undefined ? { errorMessage } : {}),
+        },
+      });
+    },
+  );
+
+  it("records reviewer run completion without changing card status in phase 3", async () => {
+    const result = await runDecision(
+      {
+        type: "kanban.run.complete",
+        commandId: CommandId.makeUnsafe("cmd_reviewer_complete"),
+        runId: KanbanRunId.makeUnsafe("run_reviewer"),
+        cardId,
+        status: "completed",
+        completedAt: now,
+      },
+      {
+        ...readModelWithBoard(),
+        cards: [readyCard("reviewing")],
+        runs: [
+          {
+            id: KanbanRunId.makeUnsafe("run_reviewer"),
+            cardId,
+            role: "reviewer",
+            status: "running",
+            threadId: ThreadId.makeUnsafe("thread_reviewer_1"),
+            startedAt: now,
+          },
+        ],
+      },
+    );
+
+    const events = asEvents(result);
+    expect(events.map((event) => event.type)).toEqual(["kanban.run.completed"]);
+    expect(events[0]?.payload).toMatchObject({
+      run: {
+        id: KanbanRunId.makeUnsafe("run_reviewer"),
+        status: "completed",
+      },
+    });
+  });
+
   it("rejects review completion when the referenced run belongs to another card or is a worker run", async () => {
     const otherCardRunExit = await runDecisionExit(
       {

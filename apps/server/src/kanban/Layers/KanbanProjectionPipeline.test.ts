@@ -154,8 +154,8 @@ describe("KanbanProjectionPipeline", () => {
         payload: {
           cardId,
           fromStatus: "draft",
-          toStatus: "ready",
-          reason: null,
+          toStatus: "agent_error",
+          reason: "Worker summary was malformed",
           updatedAt: createdAt,
         },
       }),
@@ -176,18 +176,25 @@ describe("KanbanProjectionPipeline", () => {
         readonly cardId: string;
         readonly specPath: string | null;
         readonly status: string;
+        readonly blockerReason: string | null;
         readonly modelSelectionJson: string;
       }>`
         SELECT
           card_id AS "cardId",
           spec_path AS "specPath",
           status,
+          blocker_reason AS "blockerReason",
           model_selection_json AS "modelSelectionJson"
         FROM projection_kanban_cards
       `,
     );
     expect(cards).toHaveLength(1);
-    expect(cards[0]).toMatchObject({ cardId, specPath: null, status: "ready" });
+    expect(cards[0]).toMatchObject({
+      cardId,
+      specPath: null,
+      status: "agent_error",
+      blockerReason: "Worker summary was malformed",
+    });
     expect(JSON.parse(cards[0]!.modelSelectionJson)).toEqual({
       provider: "codex",
       model: "gpt-5-codex",

@@ -245,6 +245,25 @@ function targetStatusForRunStart(
   return command.role === "worker" ? "implementing" : "reviewing";
 }
 
+function targetStatusForWorkerRunCompletion(
+  command: Extract<KanbanCommand, { readonly type: "kanban.run.complete" }>,
+): {
+  readonly toStatus: KanbanCardStatus;
+  readonly reason: string | null;
+} {
+  switch (command.status) {
+    case "completed":
+      return { toStatus: "reviewing", reason: null };
+    case "failed":
+      return { toStatus: "agent_error", reason: command.errorMessage ?? "Worker run failed" };
+    case "interrupted":
+      return {
+        toStatus: "agent_error",
+        reason: command.errorMessage ?? "Worker run interrupted",
+      };
+  }
+}
+
 function reviewOutcomeStatus(
   review: Extract<KanbanCommand, { readonly type: "kanban.review.complete" }>["review"],
 ): {
@@ -461,7 +480,7 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
       if (run.status !== "running") {
         return yield* fail(command, `Run '${command.runId}' is not running.`);
       }
-      return {
+      const runCompletedEvent: Omit<KanbanEvent, "sequence"> = {
         ...eventBase({
           aggregateKind: "card",
           aggregateId: command.cardId,
@@ -478,6 +497,23 @@ export const decideKanbanCommand = Effect.fn("decideKanbanCommand")(function* ({
           },
         },
       };
+      if (run.role !== "worker") {
+        return runCompletedEvent;
+      }
+
+      const card = yield* requireCard(command, readModel, command.cardId);
+      const target = targetStatusForWorkerRunCompletion(command);
+      yield* requireStatusTransition(command, card.status, target.toStatus);
+      return [
+        statusChangedEvent({
+          command,
+          card,
+          toStatus: target.toStatus,
+          reason: target.reason,
+          updatedAt: command.completedAt,
+        }),
+        runCompletedEvent,
+      ];
     }
 
     case "kanban.review.complete": {

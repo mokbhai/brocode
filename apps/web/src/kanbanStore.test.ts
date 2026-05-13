@@ -288,11 +288,27 @@ describe("kanbanStore state", () => {
         4,
       ),
     );
+    const afterAgentError = applyKanbanEventToSnapshot(
+      afterBlocked,
+      makeEvent(
+        "kanban.card.status-changed",
+        {
+          cardId,
+          fromStatus: "implementing",
+          toStatus: "agent_error",
+          reason: "Worker summary was malformed",
+          updatedAt: "2026-05-12T03:00:00.000Z",
+        },
+        5,
+      ),
+    );
 
     expect(afterTask.tasksByCardId[cardId]?.map((task) => task.id)).toEqual([taskId, newTask.id]);
     expect(afterDelete.tasksByCardId[cardId]?.map((task) => task.id)).toEqual([newTask.id]);
     expect(afterBlocked.cards[0]?.status).toBe("blocked");
     expect(afterBlocked.cards[0]?.blockerReason).toBe("Needs product decision");
+    expect(afterAgentError.cards[0]?.status).toBe("agent_error");
+    expect(afterAgentError.cards[0]?.blockerReason).toBe("Worker summary was malformed");
   });
 
   it("strips legacy specPath from streamed card events before updating snapshots", () => {

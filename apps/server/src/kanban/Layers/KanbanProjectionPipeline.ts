@@ -24,6 +24,13 @@ function stripLegacySpecPath(card: KanbanEventCard): KanbanCard {
   return nextCard;
 }
 
+function statusReasonPatch(
+  toStatus: KanbanCard["status"],
+  reason: string | null,
+): string | null {
+  return toStatus === "blocked" || toStatus === "agent_error" ? reason : null;
+}
+
 const makeKanbanProjectionPipeline = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const eventStore = yield* KanbanEventStore;
@@ -287,7 +294,7 @@ const makeKanbanProjectionPipeline = Effect.gen(function* () {
         return updateCardStatus({
           cardId: event.payload.cardId,
           status: event.payload.toStatus,
-          blockerReason: event.payload.toStatus === "blocked" ? event.payload.reason : null,
+          blockerReason: statusReasonPatch(event.payload.toStatus, event.payload.reason),
           updatedAt: event.payload.updatedAt,
         });
 

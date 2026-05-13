@@ -110,6 +110,13 @@ function patchCardThread(
   });
 }
 
+function statusReasonPatch(
+  toStatus: KanbanCard["status"],
+  reason: string | null,
+): string | null {
+  return toStatus === "blocked" || toStatus === "agent_error" ? reason : null;
+}
+
 function upsertTasks(
   tasks: ReadonlyArray<KanbanTask>,
   nextTasks: ReadonlyArray<KanbanTask>,
@@ -171,7 +178,7 @@ export function projectKanbanEvent(
           ...nextBase,
           cards: updateCard(nextBase.cards, payload.cardId, {
             status: payload.toStatus,
-            blockerReason: payload.toStatus === "blocked" ? payload.reason : null,
+            blockerReason: statusReasonPatch(payload.toStatus, payload.reason),
             updatedAt: payload.updatedAt,
           }),
         })),

@@ -148,6 +148,13 @@ function stripLegacySpecPath(card: KanbanEventCard): KanbanCard {
   return nextCard;
 }
 
+function statusReasonPatch(
+  toStatus: KanbanCardStatus,
+  reason: string | null,
+): string | null {
+  return toStatus === "blocked" || toStatus === "agent_error" ? reason : null;
+}
+
 function upsertTaskInSnapshot(snapshot: KanbanBoardSnapshot, task: KanbanTask): KanbanBoardSnapshot {
   if (!snapshotHasCard(snapshot, task.cardId)) {
     return snapshot;
@@ -267,7 +274,7 @@ export function applyKanbanEventToSnapshot(
       }
       return updateCard(withEventSequence(snapshot, event), event.payload.cardId, {
         status: event.payload.toStatus,
-        blockerReason: event.payload.toStatus === "blocked" ? event.payload.reason : null,
+        blockerReason: statusReasonPatch(event.payload.toStatus, event.payload.reason),
         updatedAt: event.payload.updatedAt,
       });
 
