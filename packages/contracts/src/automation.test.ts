@@ -265,6 +265,28 @@ it.effect("decodes automation websocket dispatch requests", () =>
   }),
 );
 
+it.effect("decodes automation websocket subscribe requests", () =>
+  Effect.gen(function* () {
+    const subscribe = yield* Schema.decodeUnknownEffect(WebSocketRequest)({
+      id: "req-automation-subscribe-1",
+      body: {
+        _tag: AUTOMATION_WS_METHODS.subscribe,
+      },
+    });
+
+    assert.strictEqual(subscribe.body._tag, AUTOMATION_WS_METHODS.subscribe);
+
+    const unsubscribe = yield* Schema.decodeUnknownEffect(WebSocketRequest)({
+      id: "req-automation-unsubscribe-1",
+      body: {
+        _tag: AUTOMATION_WS_METHODS.unsubscribe,
+      },
+    });
+
+    assert.strictEqual(unsubscribe.body._tag, AUTOMATION_WS_METHODS.unsubscribe);
+  }),
+);
+
 it.effect("decodes automation websocket event pushes", () =>
   Effect.gen(function* () {
     const parsed = yield* Schema.decodeUnknownEffect(WsResponse)({
