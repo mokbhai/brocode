@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 
 import {
   CommandId,
+  AUTOMATION_WS_METHODS,
   KANBAN_WS_METHODS,
   ORCHESTRATION_WS_METHODS,
   ThreadId,
@@ -37,6 +38,14 @@ import {
   KanbanWorkerCoordinator,
   type KanbanWorkerCoordinatorShape,
 } from "./kanban/Services/KanbanWorkerCoordinator";
+import {
+  AutomationEngineService,
+  type AutomationEngineShape,
+} from "./automation/Services/AutomationEngine";
+import {
+  AutomationSnapshotQuery,
+  type AutomationSnapshotQueryShape,
+} from "./automation/Services/AutomationSnapshotQuery";
 import { GitCore } from "./git/Services/GitCore";
 import { GitManager } from "./git/Services/GitManager";
 import { GitStatusBroadcaster } from "./git/Services/GitStatusBroadcaster";
@@ -143,6 +152,20 @@ function durableBoardEventStream(input: {
   );
 }
 
+function durableAutomationEventStream(input: { readonly automationEngine: AutomationEngineShape }) {
+  return Stream.paginate(0, (cursor) =>
+    Stream.runCollect(input.automationEngine.readEvents(cursor)).pipe(
+      Effect.flatMap((events) => {
+        if (events.length === 0) {
+          return Effect.sleep("100 millis").pipe(Effect.as([[], Option.some(cursor)] as const));
+        }
+        const lastSequence = events[events.length - 1]!.sequence;
+        return Effect.succeed([Array.from(events), Option.some(lastSequence)] as const);
+      }),
+    ),
+  );
+}
+
 export function makeKanbanWsHandlers(input: {
   readonly kanbanEngine: KanbanEngineShape;
   readonly kanbanSnapshotQuery: KanbanSnapshotQueryShape;
@@ -189,9 +212,48 @@ export function makeKanbanWsHandlers(input: {
   >;
 }
 
+export function makeAutomationWsHandlers(input: {
+  readonly automationEngine: AutomationEngineShape;
+  readonly automationSnapshotQuery: AutomationSnapshotQueryShape;
+}) {
+  const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
+    effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+
+  return {
+    [AUTOMATION_WS_METHODS.getSnapshot]: () =>
+      rpcEffect(
+        input.automationSnapshotQuery.getSnapshot(),
+        "Failed to load automation snapshot",
+      ),
+    [AUTOMATION_WS_METHODS.dispatchCommand]: (command) =>
+      rpcEffect(
+        input.automationEngine.dispatch(command),
+        "Failed to dispatch automation command",
+      ),
+    [AUTOMATION_WS_METHODS.subscribe]: () =>
+      Stream.unwrap(
+        input.automationSnapshotQuery.getSnapshot().pipe(
+          Effect.map(() =>
+            durableAutomationEventStream({ automationEngine: input.automationEngine }),
+          ),
+          Effect.mapError((cause) => toWsRpcError(cause, "Failed to subscribe to automations")),
+        ),
+      ).pipe(Stream.mapError((cause) => toWsRpcError(cause, "Automation stream failed"))),
+    [AUTOMATION_WS_METHODS.unsubscribe]: () => Effect.void,
+  } satisfies Pick<
+    Parameters<typeof WsRpcGroup.of>[0],
+    | typeof AUTOMATION_WS_METHODS.getSnapshot
+    | typeof AUTOMATION_WS_METHODS.dispatchCommand
+    | typeof AUTOMATION_WS_METHODS.subscribe
+    | typeof AUTOMATION_WS_METHODS.unsubscribe
+  >;
+}
+
 export const makeWsRpcLayer = () =>
   WsRpcGroup.toLayer(
     Effect.gen(function* () {
+      const automationEngine = yield* AutomationEngineService;
+      const automationSnapshotQuery = yield* AutomationSnapshotQuery;
       const checkpointDiffQuery = yield* CheckpointDiffQuery;
       const config = yield* ServerConfig;
       const fileSystem = yield* FileSystem.FileSystem;
@@ -468,6 +530,7 @@ export const makeWsRpcLayer = () =>
               runtimeStartup.enqueueCommand(kanbanWorkerCoordinator.startWorkerRun(input)),
           },
         }),
+        ...makeAutomationWsHandlers({ automationEngine, automationSnapshotQuery }),
 
         [WS_METHODS.projectsListDirectories]: (input) =>
           rpcEffect(

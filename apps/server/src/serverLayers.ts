@@ -29,6 +29,7 @@ import { WorkspaceLayerLive } from "./workspace/runtimeLayer";
 import { ProjectFaviconResolverLive } from "./project/Layers/ProjectFaviconResolver";
 import { ServerEnvironmentLive } from "./environment/Layers/ServerEnvironment";
 import { KanbanLayerLive, KanbanWorkerCoordinatorLayerLive } from "./kanban/runtimeLayer";
+import { AutomationLayerLive } from "./automation/runtimeLayer";
 
 export { makeServerProviderLayer } from "./provider/runtimeLayer";
 
@@ -48,6 +49,7 @@ export function makeServerRuntimeServicesLayer() {
       Layer.provideMerge(GitCoreLive),
       Layer.provideMerge(ServerSettingsLive),
     ),
+    AutomationLayerLive,
     checkpointStoreLayer,
     checkpointDiffQueryLayer,
     RuntimeReceiptBusLive,
