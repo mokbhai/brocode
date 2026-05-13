@@ -19,3 +19,4 @@ export * from "./project";
 export * from "./filesystem";
 export * from "./rpc";
 export * from "./kanban";
+export * from "./automation";
