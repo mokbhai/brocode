@@ -33,6 +33,10 @@ import {
   KanbanSnapshotQuery,
   type KanbanSnapshotQueryShape,
 } from "./kanban/Services/KanbanSnapshotQuery";
+import {
+  KanbanWorkerCoordinator,
+  type KanbanWorkerCoordinatorShape,
+} from "./kanban/Services/KanbanWorkerCoordinator";
 import { GitCore } from "./git/Services/GitCore";
 import { GitManager } from "./git/Services/GitManager";
 import { GitStatusBroadcaster } from "./git/Services/GitStatusBroadcaster";
@@ -142,6 +146,7 @@ function durableBoardEventStream(input: {
 export function makeKanbanWsHandlers(input: {
   readonly kanbanEngine: KanbanEngineShape;
   readonly kanbanSnapshotQuery: KanbanSnapshotQueryShape;
+  readonly kanbanWorkerCoordinator: Pick<KanbanWorkerCoordinatorShape, "startWorkerRun">;
 }) {
   const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
     effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
@@ -154,6 +159,11 @@ export function makeKanbanWsHandlers(input: {
       ),
     [KANBAN_WS_METHODS.dispatchCommand]: (command) =>
       rpcEffect(input.kanbanEngine.dispatch(command), "Failed to dispatch Kanban command"),
+    [KANBAN_WS_METHODS.startWorkerRun]: (startInput) =>
+      rpcEffect(
+        input.kanbanWorkerCoordinator.startWorkerRun(startInput),
+        "Failed to start Kanban worker run",
+      ),
     [KANBAN_WS_METHODS.subscribeBoard]: (subscribeInput) =>
       Stream.unwrap(
         input.kanbanSnapshotQuery.getSnapshot(subscribeInput).pipe(
@@ -173,6 +183,7 @@ export function makeKanbanWsHandlers(input: {
     Parameters<typeof WsRpcGroup.of>[0],
     | typeof KANBAN_WS_METHODS.getSnapshot
     | typeof KANBAN_WS_METHODS.dispatchCommand
+    | typeof KANBAN_WS_METHODS.startWorkerRun
     | typeof KANBAN_WS_METHODS.subscribeBoard
     | typeof KANBAN_WS_METHODS.unsubscribeBoard
   >;
@@ -189,6 +200,7 @@ export const makeWsRpcLayer = () =>
       const gitStatusBroadcaster = yield* GitStatusBroadcaster;
       const kanbanEngine = yield* KanbanEngineService;
       const kanbanSnapshotQuery = yield* KanbanSnapshotQuery;
+      const kanbanWorkerCoordinator = yield* KanbanWorkerCoordinator;
       const keybindings = yield* Keybindings;
       const open = yield* Open;
       const orchestrationEngine = yield* OrchestrationEngineService;
@@ -372,7 +384,10 @@ export const makeWsRpcLayer = () =>
             "Failed to load orchestration shell snapshot",
           ),
         [ORCHESTRATION_WS_METHODS.repairState]: () =>
-          rpcEffect(orchestrationEngine.repairState(), "Failed to repair orchestration state"),
+          rpcEffect(
+            runtimeStartup.enqueueCommand(orchestrationEngine.repairState()),
+            "Failed to repair orchestration state",
+          ),
         [ORCHESTRATION_WS_METHODS.getTurnDiff]: (input) =>
           rpcEffect(checkpointDiffQuery.getTurnDiff(input), "Failed to load turn diff"),
         [ORCHESTRATION_WS_METHODS.getFullThreadDiff]: (input) =>
@@ -445,7 +460,14 @@ export const makeWsRpcLayer = () =>
         [ORCHESTRATION_WS_METHODS.unsubscribeThread]: () => Effect.void,
         [WS_METHODS.subscribeOrchestrationDomainEvents]: () =>
           orchestrationEngine.streamDomainEvents,
-        ...makeKanbanWsHandlers({ kanbanEngine, kanbanSnapshotQuery }),
+        ...makeKanbanWsHandlers({
+          kanbanEngine,
+          kanbanSnapshotQuery,
+          kanbanWorkerCoordinator: {
+            startWorkerRun: (input) =>
+              runtimeStartup.enqueueCommand(kanbanWorkerCoordinator.startWorkerRun(input)),
+          },
+        }),
 
         [WS_METHODS.projectsListDirectories]: (input) =>
           rpcEffect(

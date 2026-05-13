@@ -2,7 +2,9 @@ import {
   CommandId,
   KanbanBoardId,
   KanbanCardId,
+  KanbanRunId,
   ProjectId,
+  ThreadId,
   type KanbanCommand,
   type KanbanEvent,
 } from "@t3tools/contracts";
@@ -17,6 +19,7 @@ import { KanbanProjectionPipelineLive } from "./kanban/Layers/KanbanProjectionPi
 import { KanbanSnapshotQueryLive } from "./kanban/Layers/KanbanSnapshotQuery.ts";
 import { KanbanEngineService } from "./kanban/Services/KanbanEngine.ts";
 import { KanbanSnapshotQuery } from "./kanban/Services/KanbanSnapshotQuery.ts";
+import type { KanbanWorkerCoordinatorShape } from "./kanban/Services/KanbanWorkerCoordinator.ts";
 
 const projectId = ProjectId.makeUnsafe("project-kanban-ws");
 const boardId = KanbanBoardId.makeUnsafe("board-kanban-ws");
@@ -64,8 +67,20 @@ async function createKanbanRpcSystem() {
       return yield* KanbanSnapshotQuery;
     }),
   );
+  const workerCoordinator: KanbanWorkerCoordinatorShape = {
+    start: () => Effect.never,
+    startWorkerRun: () =>
+      Effect.succeed({
+        runId: KanbanRunId.makeUnsafe("run-kanban-ws-worker"),
+        threadId: ThreadId.makeUnsafe("thread-kanban-ws-worker"),
+      }),
+  };
   return {
-    handlers: makeKanbanWsHandlers({ kanbanEngine: engine, kanbanSnapshotQuery: snapshotQuery }),
+    handlers: makeKanbanWsHandlers({
+      kanbanEngine: engine,
+      kanbanSnapshotQuery: snapshotQuery,
+      kanbanWorkerCoordinator: workerCoordinator,
+    }),
     run: <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(effect),
     dispose: () => runtime.dispose(),
   };
@@ -149,6 +164,18 @@ describe("Kanban WebSocket RPC handlers", () => {
       "kanban.card.created",
     ]);
 
+    await system.dispose();
+  });
+
+  it("starts worker runs through the Kanban coordinator handler", async () => {
+    const system = await createKanbanRpcSystem();
+
+    const result = await system.run(system.handlers["kanban.startWorkerRun"]({ cardId }));
+
+    expect(result).toEqual({
+      runId: "run-kanban-ws-worker",
+      threadId: "thread-kanban-ws-worker",
+    });
     await system.dispose();
   });
 });
