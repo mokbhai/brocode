@@ -7830,6 +7830,23 @@ export default function ChatView({
                 }
               : null
           }
+          kanbanAction={
+            activeProject
+              ? {
+                  label: "Create Kanban card",
+                  onClick: () => {
+                    void navigate({
+                      to: "/kanban/$projectId",
+                      params: { projectId: activeProject.id },
+                      search: () => ({
+                        sourceThreadId: activeThread.id,
+                        title: activeThreadDisplayTitle,
+                      }),
+                    });
+                  },
+                }
+              : null
+          }
           onRunProjectScript={onRunProjectScriptFromHeader}
           onAddProjectScript={saveProjectScript}
           onUpdateProjectScript={updateProjectScript}

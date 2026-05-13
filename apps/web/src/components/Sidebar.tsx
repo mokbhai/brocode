@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   FolderIcon,
   GitPullRequestIcon,
+  ListTodoIcon,
   type LucideIcon,
   SearchIcon,
   SettingsIcon,
@@ -1019,17 +1020,19 @@ function SortableProjectItem({
   );
 }
 
+type SidebarView = "threads" | "workspace" | "kanban";
+
 function SidebarSegmentedPicker({
   activeView,
   onSelectView,
 }: {
-  activeView: "threads" | "workspace";
-  onSelectView: (view: "threads" | "workspace") => void;
+  activeView: SidebarView;
+  onSelectView: (view: SidebarView) => void;
 }) {
   return (
     <div className="px-3 pb-2.5">
       <div className="inline-flex w-full rounded-md bg-[var(--color-background-elevated-secondary)] p-0.5">
-        {(["threads", "workspace"] as const).map((view) => {
+        {(["threads", "workspace", "kanban"] as const).map((view) => {
           const active = activeView === view;
           return (
             <button
@@ -1043,7 +1046,7 @@ function SidebarSegmentedPicker({
               )}
               onClick={() => onSelectView(view)}
             >
-              {view === "threads" ? "Threads" : "Workspace"}
+              {view === "threads" ? "Threads" : view === "workspace" ? "Workspace" : "Kanban"}
             </button>
           );
         })}
@@ -1132,6 +1135,7 @@ export default function Sidebar() {
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const isOnSettings = useLocation({ select: (loc) => loc.pathname === "/settings" });
   const isOnWorkspace = pathname.startsWith("/workspace");
+  const isOnKanban = pathname.startsWith("/kanban");
   const { settings: appSettings, updateSettings } = useAppSettings();
   const { handleNewThread } = useHandleNewThread();
   const { handleNewChat } = useHandleNewChat();
@@ -1143,6 +1147,10 @@ export default function Sidebar() {
   const routeWorkspaceId = useParams({
     strict: false,
     select: (params) => (typeof params.workspaceId === "string" ? params.workspaceId : null),
+  });
+  const routeKanbanProjectId = useParams({
+    strict: false,
+    select: (params) => (typeof params.projectId === "string" ? params.projectId : null),
   });
   const routeSearch = useSearch({
     strict: false,
@@ -1677,14 +1685,36 @@ export default function Sidebar() {
     [navigate],
   );
 
+  const navigateToKanban = useCallback(
+    (projectId: ProjectId) => {
+      void navigate({
+        to: "/kanban/$projectId",
+        params: { projectId },
+      });
+    },
+    [navigate],
+  );
+
   const handleSidebarViewChange = useCallback(
-    (view: "threads" | "workspace") => {
+    (view: SidebarView) => {
       if (view === "workspace") {
         const fallbackWorkspaceId = workspacePages[0]?.id;
         if (!fallbackWorkspaceId) {
           return;
         }
         navigateToWorkspace(routeWorkspaceId ?? fallbackWorkspaceId);
+        return;
+      }
+
+      if (view === "kanban") {
+        const projectId = routeKanbanProjectId
+          ? ProjectId.makeUnsafe(routeKanbanProjectId)
+          : currentProjectShortcutTargetId;
+        if (projectId) {
+          navigateToKanban(projectId);
+          return;
+        }
+        handleStartAddProject();
         return;
       }
 
@@ -1706,10 +1736,14 @@ export default function Sidebar() {
       void handleNewChat({ fresh: true });
     },
     [
+      currentProjectShortcutTargetId,
       handleNewChat,
+      handleStartAddProject,
       lastThreadRoute,
       navigate,
+      navigateToKanban,
       navigateToWorkspace,
+      routeKanbanProjectId,
       routeWorkspaceId,
       sidebarThreadSummaryById,
       workspacePages,
@@ -5384,38 +5418,40 @@ export default function Sidebar() {
           <>
             {isElectron ? sidebarBrand : null}
             <SidebarSegmentedPicker
-              activeView={isOnWorkspace ? "workspace" : "threads"}
+              activeView={isOnKanban ? "kanban" : isOnWorkspace ? "workspace" : "threads"}
               onSelectView={handleSidebarViewChange}
             />
             {/* Primary sidebar actions stay limited to features we currently ship. */}
-            <SidebarGroup className="px-1.5 pt-1 pb-1.5">
-              <SidebarMenu className="gap-0.5">
-                {isOnWorkspace ? (
-                  <SidebarPrimaryAction
-                    icon={TerminalIcon}
-                    label="New workspace"
-                    onClick={handleCreateWorkspace}
-                  />
-                ) : (
-                  <>
+            {!isOnKanban ? (
+              <SidebarGroup className="px-1.5 pt-1 pb-1.5">
+                <SidebarMenu className="gap-0.5">
+                  {isOnWorkspace ? (
                     <SidebarPrimaryAction
-                      icon={SquarePenIcon}
-                      label="New thread"
-                      onClick={handlePrimaryNewThread}
+                      icon={TerminalIcon}
+                      label="New workspace"
+                      onClick={handleCreateWorkspace}
                     />
-                    <SidebarPrimaryAction
-                      icon={SearchIcon}
-                      label="Search"
-                      active={searchPaletteOpen}
-                      onClick={() => {
-                        setSearchPaletteOpen(true);
-                      }}
-                      shortcutLabel={searchShortcutLabel}
-                    />
-                  </>
-                )}
-              </SidebarMenu>
-            </SidebarGroup>
+                  ) : (
+                    <>
+                      <SidebarPrimaryAction
+                        icon={SquarePenIcon}
+                        label="New thread"
+                        onClick={handlePrimaryNewThread}
+                      />
+                      <SidebarPrimaryAction
+                        icon={SearchIcon}
+                        label="Search"
+                        active={searchPaletteOpen}
+                        onClick={() => {
+                          setSearchPaletteOpen(true);
+                        }}
+                        shortcutLabel={searchShortcutLabel}
+                      />
+                    </>
+                  )}
+                </SidebarMenu>
+              </SidebarGroup>
+            ) : null}
 
             {isOnWorkspace ? (
               <SidebarGroup className="px-1.5 pt-1 pb-1.5">
@@ -5531,8 +5567,41 @@ export default function Sidebar() {
                   </SidebarMenu>
                 </DndContext>
               </SidebarGroup>
+            ) : isOnKanban ? (
+              <SidebarGroup className="px-1.5 pt-1 pb-1.5">
+                <div className="my-2 h-px w-full bg-border" />
+                <div className="mb-1.5 flex items-center px-2">
+                  <span className="text-[length:var(--app-font-size-ui,12px)] font-normal tracking-tight text-muted-foreground/58">
+                    Kanban
+                  </span>
+                </div>
+                <SidebarMenu className="gap-0.5">
+                  {standardProjects.length > 0 ? (
+                    standardProjects.map((project) => (
+                      <SidebarMenuItem key={project.id}>
+                        <SidebarMenuButton
+                          size="sm"
+                          isActive={routeKanbanProjectId === project.id}
+                          className="h-8 gap-2 rounded-lg px-2 font-system-ui text-[length:var(--app-font-size-ui,12px)] font-normal text-foreground/89 transition-colors hover:bg-[var(--sidebar-accent)] data-[active=true]:bg-[var(--sidebar-accent-active)] data-[active=true]:text-[var(--sidebar-accent-foreground)]"
+                          onClick={() => navigateToKanban(project.id)}
+                        >
+                          <ListTodoIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+                          <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))
+                  ) : (
+                    <SidebarPrimaryAction
+                      icon={FolderIcon}
+                      label="Add project"
+                      onClick={handleStartAddProject}
+                    />
+                  )}
+                </SidebarMenu>
+              </SidebarGroup>
             ) : (
-              <SidebarGroup className="px-1.5 py-1.5">
+              <>
+                <SidebarGroup className="px-1.5 py-1.5">
                 {pinnedThreads.length > 0 ? (
                   <>
                     <div className="my-1 flex items-center justify-between px-2 py-1">
@@ -5757,7 +5826,8 @@ export default function Sidebar() {
                     No projects yet
                   </div>
                 )}
-              </SidebarGroup>
+                </SidebarGroup>
+              </>
             )}
           </>
         )}

@@ -118,6 +118,17 @@ import type {
   ProviderReadPluginResult,
 } from "./providerDiscovery";
 import type { ProviderCompactThreadInput } from "./provider";
+import type {
+  ClientKanbanCommand,
+  KanbanBoardSnapshot,
+  KanbanDispatchCommandResult,
+  KanbanEvent,
+  KanbanGetSnapshotInput,
+  KanbanStartWorkerRunInput,
+  KanbanStartWorkerRunResult,
+  KanbanSubscribeBoardInput,
+  KanbanUnsubscribeBoardInput,
+} from "./kanban";
 
 export interface ContextMenuItem<T extends string = string> {
   id: T;
@@ -445,6 +456,14 @@ export interface NativeApi {
     onDomainEvent: (callback: (event: OrchestrationEvent) => void) => () => void;
     onShellEvent: (callback: (event: OrchestrationShellStreamItem) => void) => () => void;
     onThreadEvent: (callback: (event: OrchestrationThreadStreamItem) => void) => () => void;
+  };
+  kanban: {
+    getSnapshot: (input: KanbanGetSnapshotInput) => Promise<KanbanBoardSnapshot>;
+    dispatchCommand: (command: ClientKanbanCommand) => Promise<KanbanDispatchCommandResult>;
+    startWorkerRun: (input: KanbanStartWorkerRunInput) => Promise<KanbanStartWorkerRunResult>;
+    subscribeBoard: (input: KanbanSubscribeBoardInput) => Promise<void>;
+    unsubscribeBoard: (input: KanbanUnsubscribeBoardInput) => Promise<void>;
+    onBoardEvent: (callback: (event: KanbanEvent) => void) => () => void;
   };
   browser: {
     open: (input: BrowserOpenInput) => Promise<ThreadBrowserState>;

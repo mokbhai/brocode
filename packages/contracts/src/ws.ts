@@ -2,6 +2,18 @@ import { Schema, Struct } from "effect";
 import { NonNegativeInt, ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas";
 
 import {
+  KANBAN_WS_CHANNELS,
+  KANBAN_WS_METHODS,
+  KanbanEvent,
+  KanbanRpcSchemas,
+} from "./kanban";
+import {
+  AUTOMATION_WS_CHANNELS,
+  AUTOMATION_WS_METHODS,
+  AutomationEvent,
+  AutomationRpcSchemas,
+} from "./automation";
+import {
   ClientOrchestrationCommand,
   OrchestrationEvent,
   OrchestrationImportThreadInput,
@@ -186,6 +198,25 @@ const tagRequestBody = <const Tag extends string, const Fields extends Schema.St
   );
 
 const WebSocketRequestBody = Schema.Union([
+  // Kanban methods
+  tagRequestBody(KANBAN_WS_METHODS.getSnapshot, KanbanRpcSchemas.getSnapshot.input),
+  tagRequestBody(
+    KANBAN_WS_METHODS.dispatchCommand,
+    Schema.Struct({ command: KanbanRpcSchemas.dispatchCommand.input }),
+  ),
+  tagRequestBody(KANBAN_WS_METHODS.startWorkerRun, KanbanRpcSchemas.startWorkerRun.input),
+  tagRequestBody(KANBAN_WS_METHODS.subscribeBoard, KanbanRpcSchemas.subscribeBoard.input),
+  tagRequestBody(KANBAN_WS_METHODS.unsubscribeBoard, KanbanRpcSchemas.unsubscribeBoard.input),
+
+  // Automation methods
+  tagRequestBody(AUTOMATION_WS_METHODS.getSnapshot, AutomationRpcSchemas.getSnapshot.input),
+  tagRequestBody(
+    AUTOMATION_WS_METHODS.dispatchCommand,
+    Schema.Struct({ command: AutomationRpcSchemas.dispatchCommand.input }),
+  ),
+  tagRequestBody(AUTOMATION_WS_METHODS.subscribe, AutomationRpcSchemas.subscribe.input),
+  tagRequestBody(AUTOMATION_WS_METHODS.unsubscribe, AutomationRpcSchemas.unsubscribe.input),
+
   // Orchestration methods
   tagRequestBody(
     ORCHESTRATION_WS_METHODS.dispatchCommand,
@@ -308,6 +339,8 @@ export interface WsPushPayloadByChannel {
   readonly [ORCHESTRATION_WS_CHANNELS.domainEvent]: OrchestrationEvent;
   readonly [ORCHESTRATION_WS_CHANNELS.shellEvent]: OrchestrationShellStreamItem;
   readonly [ORCHESTRATION_WS_CHANNELS.threadEvent]: OrchestrationThreadStreamItem;
+  readonly [KANBAN_WS_CHANNELS.boardEvent]: KanbanEvent;
+  readonly [AUTOMATION_WS_CHANNELS.event]: AutomationEvent;
 }
 
 export type WsPushChannel = keyof WsPushPayloadByChannel;
@@ -358,6 +391,14 @@ export const WsPushOrchestrationThreadEvent = makeWsPushSchema(
   ORCHESTRATION_WS_CHANNELS.threadEvent,
   OrchestrationThreadStreamItem,
 );
+export const WsPushKanbanBoardEvent = makeWsPushSchema(
+  KANBAN_WS_CHANNELS.boardEvent,
+  KanbanEvent,
+);
+export const WsPushAutomationEvent = makeWsPushSchema(
+  AUTOMATION_WS_CHANNELS.event,
+  AutomationEvent,
+);
 
 export const WsPushChannelSchema = Schema.Literals([
   WS_CHANNELS.gitActionProgress,
@@ -370,6 +411,8 @@ export const WsPushChannelSchema = Schema.Literals([
   ORCHESTRATION_WS_CHANNELS.domainEvent,
   ORCHESTRATION_WS_CHANNELS.shellEvent,
   ORCHESTRATION_WS_CHANNELS.threadEvent,
+  KANBAN_WS_CHANNELS.boardEvent,
+  AUTOMATION_WS_CHANNELS.event,
 ]);
 export type WsPushChannelSchema = typeof WsPushChannelSchema.Type;
 
@@ -384,6 +427,8 @@ export const WsPush = Schema.Union([
   WsPushOrchestrationDomainEvent,
   WsPushOrchestrationShellEvent,
   WsPushOrchestrationThreadEvent,
+  WsPushKanbanBoardEvent,
+  WsPushAutomationEvent,
 ]);
 export type WsPush = typeof WsPush.Type;
 

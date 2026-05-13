@@ -1,11 +1,14 @@
 import {
   ORCHESTRATION_WS_CHANNELS,
   ORCHESTRATION_WS_METHODS,
+  KANBAN_WS_CHANNELS,
+  KANBAN_WS_METHODS,
   WS_CHANNELS,
   WS_METHODS,
   WsRpcGroup,
   type GitActionProgressEvent,
   type GitRunStackedActionResult,
+  type KanbanEvent,
   type OrchestrationEvent,
   type OrchestrationShellStreamItem,
   type OrchestrationThreadStreamItem,
@@ -29,11 +32,17 @@ type RpcClientInstance =
   RpcClientEffect extends Effect.Effect<infer Client, any, any> ? Client : never;
 
 type TransportState = "connecting" | "open" | "closed" | "disposed";
+interface StreamRestartOptions {
+  readonly shouldReconnectOnFailure?: (cause: Cause.Cause<unknown>) => boolean;
+}
 
 class WsTransportRpcError extends Data.TaggedError("WsTransportRpcError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
+
+export const KANBAN_RPC_UNAVAILABLE_MESSAGE =
+  "Kanban RPC is not available until the Kanban engine is initialized";
 
 const makeRpcClient = RpcClient.make(WsRpcGroup);
 
@@ -81,6 +90,24 @@ export function shouldKeepServerLifecycleStream(activeChannels: ReadonlySet<stri
   );
 }
 
+export function shouldRestartKanbanBoardStream(
+  activeBoardIds: ReadonlySet<string>,
+  boardId: string,
+): boolean {
+  return activeBoardIds.has(boardId);
+}
+
+export function shouldReconnectFailedKanbanBoardStream(cause: Cause.Cause<unknown>): boolean {
+  return causeToError(cause).message !== KANBAN_RPC_UNAVAILABLE_MESSAGE;
+}
+
+function shouldReconnectFailedStream(
+  cause: Cause.Cause<unknown>,
+  options?: StreamRestartOptions,
+): boolean {
+  return options?.shouldReconnectOnFailure?.(cause) ?? true;
+}
+
 export class WsTransport {
   private readonly explicitUrl: string | null;
   private readonly listeners = new Map<string, Set<(message: WsPush) => void>>();
@@ -97,6 +124,7 @@ export class WsTransport {
   private readonly stoppingStreams = new Set<string>();
   private shellSubscribed = false;
   private readonly threadSubscriptions = new Map<string, unknown>();
+  private readonly boardSubscriptions = new Map<string, unknown>();
 
   constructor(url?: string) {
     this.explicitUrl = url ?? null;
@@ -140,9 +168,22 @@ export class WsTransport {
       this.stopStream(`orchestration.thread:${threadId}`);
       return undefined as T;
     }
+    if (method === KANBAN_WS_METHODS.subscribeBoard) {
+      const boardId = (params as { boardId: string }).boardId;
+      this.boardSubscriptions.set(boardId, params);
+      this.startBoardStream(client, boardId, params as never);
+      return undefined as T;
+    }
+    if (method === KANBAN_WS_METHODS.unsubscribeBoard) {
+      const boardId = (params as { boardId: string }).boardId;
+      this.boardSubscriptions.delete(boardId);
+      this.stopStream(`kanban.board:${boardId}`);
+      return undefined as T;
+    }
 
     const rpcInput =
-      method === ORCHESTRATION_WS_METHODS.dispatchCommand
+      method === ORCHESTRATION_WS_METHODS.dispatchCommand ||
+      method === KANBAN_WS_METHODS.dispatchCommand
         ? (params as { command: unknown }).command
         : (params ?? {});
     const call = (
@@ -269,6 +310,9 @@ export class WsTransport {
     }
     for (const [threadId, input] of this.threadSubscriptions) {
       this.startThreadStream(client, threadId, input);
+    }
+    for (const [boardId, input] of this.boardSubscriptions) {
+      this.startBoardStream(client, boardId, input);
     }
     return client;
   }
@@ -429,11 +473,33 @@ export class WsTransport {
     );
   }
 
+  private startBoardStream(client: RpcClientInstance, boardId: string, input: unknown): void {
+    const key = `kanban.board:${boardId}`;
+    this.stopStream(key);
+    this.stoppingStreams.delete(key);
+    const restartBoard = () => {
+      if (!shouldRestartKanbanBoardStream(new Set(this.boardSubscriptions.keys()), boardId)) {
+        return;
+      }
+      void this.getClient()
+        .then((nextClient) => this.startBoardStream(nextClient, boardId, input))
+        .catch((error) => console.warn("WebSocket RPC board stream failed to restart", error));
+    };
+    this.startStream(
+      key,
+      client[KANBAN_WS_METHODS.subscribeBoard](input as never),
+      (event: KanbanEvent) => this.emit(KANBAN_WS_CHANNELS.boardEvent, event),
+      restartBoard,
+      { shouldReconnectOnFailure: shouldReconnectFailedKanbanBoardStream },
+    );
+  }
+
   private startStream<T>(
     key: string,
     stream: unknown,
     listener: (event: T) => void,
     restart?: (() => void) | undefined,
+    options?: StreamRestartOptions,
   ): void {
     if (this.streamCleanups.has(key)) return;
     const runnableStream = stream as Stream.Stream<T, WsTransportRpcError, never>;
@@ -448,7 +514,7 @@ export class WsTransport {
           if (wasStoppedIntentionally || this.disposed) {
             return;
           }
-          if (restart && Exit.isFailure(exit)) {
+          if (restart && Exit.isFailure(exit) && shouldReconnectFailedStream(exit.cause, options)) {
             window.setTimeout(
               () => {
                 if (!this.disposed && !this.streamCleanups.has(key)) {

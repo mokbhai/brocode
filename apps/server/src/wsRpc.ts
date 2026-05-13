@@ -2,12 +2,16 @@ import { realpathSync } from "node:fs";
 
 import {
   CommandId,
+  AUTOMATION_WS_METHODS,
+  KANBAN_WS_METHODS,
   ORCHESTRATION_WS_METHODS,
   ThreadId,
   WS_METHODS,
   WsRpcError,
   WsRpcGroup,
   type GitActionProgressEvent,
+  type KanbanEvent,
+  type KanbanGetSnapshotInput,
   type OrchestrationEvent,
   type OrchestrationShellStreamEvent,
   type OrchestrationThreadStreamItem,
@@ -25,6 +29,19 @@ import { SessionCredentialService } from "./auth/Services/SessionCredentialServi
 import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery";
 import { ServerConfig } from "./config";
 import { importLegacyProjectThreads, listLegacyDataSources } from "./legacyDataImport";
+import { KanbanEngineService, type KanbanEngineShape } from "./kanban/Services/KanbanEngine";
+import {
+  KanbanSnapshotQuery,
+  type KanbanSnapshotQueryShape,
+} from "./kanban/Services/KanbanSnapshotQuery";
+import {
+  AutomationEngineService,
+  type AutomationEngineShape,
+} from "./automation/Services/AutomationEngine";
+import {
+  AutomationSnapshotQuery,
+  type AutomationSnapshotQueryShape,
+} from "./automation/Services/AutomationSnapshotQuery";
 import { GitCore } from "./git/Services/GitCore";
 import { GitManager } from "./git/Services/GitManager";
 import { GitStatusBroadcaster } from "./git/Services/GitStatusBroadcaster";
@@ -81,15 +98,159 @@ function isThreadDetailEvent(event: OrchestrationEvent): event is Extract<
   );
 }
 
+function makeKanbanBoardEventFilter(boardId: string, initialCardIds: ReadonlyArray<string>) {
+  const cardIds = new Set(initialCardIds);
+  return (event: KanbanEvent): boolean => {
+    switch (event.type) {
+      case "kanban.board.created":
+        return event.payload.board.id === boardId;
+      case "kanban.card.created":
+      case "kanban.card.updated":
+        if (event.payload.card.boardId !== boardId) {
+          return false;
+        }
+        cardIds.add(event.payload.card.id);
+        return true;
+      case "kanban.card.status-changed":
+      case "kanban.card.blocked":
+      case "kanban.card.approved":
+      case "kanban.card.ready-to-submit":
+        return cardIds.has(event.payload.cardId);
+      case "kanban.task.upserted":
+        return cardIds.has(event.payload.task.cardId);
+      case "kanban.task.deleted":
+        return cardIds.has(event.payload.cardId);
+      case "kanban.run.started":
+      case "kanban.run.completed":
+        return cardIds.has(event.payload.run.cardId);
+      case "kanban.review.completed":
+        return cardIds.has(event.payload.review.cardId);
+    }
+  };
+}
+
+function durableBoardEventStream(input: {
+  readonly boardId: string;
+  readonly initialCardIds: ReadonlyArray<string>;
+  readonly kanbanEngine: KanbanEngineShape;
+}) {
+  const shouldInclude = makeKanbanBoardEventFilter(input.boardId, input.initialCardIds);
+  return Stream.paginate(0, (cursor) =>
+    Stream.runCollect(input.kanbanEngine.readEvents(cursor)).pipe(
+      Effect.flatMap((events) => {
+        if (events.length === 0) {
+          return Effect.sleep("100 millis").pipe(Effect.as([[], Option.some(cursor)] as const));
+        }
+        const lastSequence = events[events.length - 1]!.sequence;
+        return Effect.succeed([events.filter(shouldInclude), Option.some(lastSequence)] as const);
+      }),
+    ),
+  );
+}
+
+function durableAutomationEventStream(input: { readonly automationEngine: AutomationEngineShape }) {
+  return Stream.paginate(0, (cursor) =>
+    Stream.runCollect(input.automationEngine.readEvents(cursor)).pipe(
+      Effect.flatMap((events) => {
+        if (events.length === 0) {
+          return Effect.sleep("100 millis").pipe(Effect.as([[], Option.some(cursor)] as const));
+        }
+        const lastSequence = events[events.length - 1]!.sequence;
+        return Effect.succeed([Array.from(events), Option.some(lastSequence)] as const);
+      }),
+    ),
+  );
+}
+
+export function makeKanbanWsHandlers(input: {
+  readonly kanbanEngine: KanbanEngineShape;
+  readonly kanbanSnapshotQuery: KanbanSnapshotQueryShape;
+}) {
+  const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
+    effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+
+  return {
+    [KANBAN_WS_METHODS.getSnapshot]: (snapshotInput: KanbanGetSnapshotInput) =>
+      rpcEffect(
+        input.kanbanSnapshotQuery.getSnapshot(snapshotInput),
+        "Failed to load Kanban board snapshot",
+      ),
+    [KANBAN_WS_METHODS.dispatchCommand]: (command) =>
+      rpcEffect(input.kanbanEngine.dispatch(command), "Failed to dispatch Kanban command"),
+    [KANBAN_WS_METHODS.subscribeBoard]: (subscribeInput) =>
+      Stream.unwrap(
+        input.kanbanSnapshotQuery.getSnapshot(subscribeInput).pipe(
+          Effect.map((snapshot) => {
+            const initialCardIds = snapshot.cards.map((card) => card.id);
+            return durableBoardEventStream({
+              boardId: subscribeInput.boardId,
+              initialCardIds,
+              kanbanEngine: input.kanbanEngine,
+            });
+          }),
+          Effect.mapError((cause) => toWsRpcError(cause, "Failed to subscribe to Kanban board")),
+        ),
+      ).pipe(Stream.mapError((cause) => toWsRpcError(cause, "Kanban board stream failed"))),
+    [KANBAN_WS_METHODS.unsubscribeBoard]: () => Effect.void,
+  } satisfies Pick<
+    Parameters<typeof WsRpcGroup.of>[0],
+    | typeof KANBAN_WS_METHODS.getSnapshot
+    | typeof KANBAN_WS_METHODS.dispatchCommand
+    | typeof KANBAN_WS_METHODS.subscribeBoard
+    | typeof KANBAN_WS_METHODS.unsubscribeBoard
+  >;
+}
+
+export function makeAutomationWsHandlers(input: {
+  readonly automationEngine: AutomationEngineShape;
+  readonly automationSnapshotQuery: AutomationSnapshotQueryShape;
+}) {
+  const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
+    effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+
+  return {
+    [AUTOMATION_WS_METHODS.getSnapshot]: () =>
+      rpcEffect(
+        input.automationSnapshotQuery.getSnapshot(),
+        "Failed to load automation snapshot",
+      ),
+    [AUTOMATION_WS_METHODS.dispatchCommand]: (command) =>
+      rpcEffect(
+        input.automationEngine.dispatch(command),
+        "Failed to dispatch automation command",
+      ),
+    [AUTOMATION_WS_METHODS.subscribe]: () =>
+      Stream.unwrap(
+        input.automationSnapshotQuery.getSnapshot().pipe(
+          Effect.map(() =>
+            durableAutomationEventStream({ automationEngine: input.automationEngine }),
+          ),
+          Effect.mapError((cause) => toWsRpcError(cause, "Failed to subscribe to automations")),
+        ),
+      ).pipe(Stream.mapError((cause) => toWsRpcError(cause, "Automation stream failed"))),
+    [AUTOMATION_WS_METHODS.unsubscribe]: () => Effect.void,
+  } satisfies Pick<
+    Parameters<typeof WsRpcGroup.of>[0],
+    | typeof AUTOMATION_WS_METHODS.getSnapshot
+    | typeof AUTOMATION_WS_METHODS.dispatchCommand
+    | typeof AUTOMATION_WS_METHODS.subscribe
+    | typeof AUTOMATION_WS_METHODS.unsubscribe
+  >;
+}
+
 export const makeWsRpcLayer = () =>
   WsRpcGroup.toLayer(
     Effect.gen(function* () {
+      const automationEngine = yield* AutomationEngineService;
+      const automationSnapshotQuery = yield* AutomationSnapshotQuery;
       const checkpointDiffQuery = yield* CheckpointDiffQuery;
       const config = yield* ServerConfig;
       const fileSystem = yield* FileSystem.FileSystem;
       const git = yield* GitCore;
       const gitManager = yield* GitManager;
       const gitStatusBroadcaster = yield* GitStatusBroadcaster;
+      const kanbanEngine = yield* KanbanEngineService;
+      const kanbanSnapshotQuery = yield* KanbanSnapshotQuery;
       const keybindings = yield* Keybindings;
       const open = yield* Open;
       const orchestrationEngine = yield* OrchestrationEngineService;
@@ -346,6 +507,8 @@ export const makeWsRpcLayer = () =>
         [ORCHESTRATION_WS_METHODS.unsubscribeThread]: () => Effect.void,
         [WS_METHODS.subscribeOrchestrationDomainEvents]: () =>
           orchestrationEngine.streamDomainEvents,
+        ...makeKanbanWsHandlers({ kanbanEngine, kanbanSnapshotQuery }),
+        ...makeAutomationWsHandlers({ automationEngine, automationSnapshotQuery }),
 
         [WS_METHODS.projectsListDirectories]: (input) =>
           rpcEffect(

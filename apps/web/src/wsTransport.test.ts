@@ -5,8 +5,15 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WS_CHANNELS } from "@t3tools/contracts";
+import { Cause } from "effect";
 
-import { shouldKeepServerLifecycleStream, WsTransport } from "./wsTransport";
+import {
+  KANBAN_RPC_UNAVAILABLE_MESSAGE,
+  shouldKeepServerLifecycleStream,
+  shouldReconnectFailedKanbanBoardStream,
+  shouldRestartKanbanBoardStream,
+  WsTransport,
+} from "./wsTransport";
 
 type WsEventType = "open" | "message" | "close" | "error";
 type WsListener = (event?: { data?: unknown }) => void;
@@ -88,6 +95,27 @@ describe("WsTransport", () => {
       ),
     ).toBe(true);
     expect(shouldKeepServerLifecycleStream(new Set([WS_CHANNELS.serverConfigUpdated]))).toBe(false);
+  });
+
+  it("restarts kanban board streams only while the board subscription is still active", () => {
+    expect(shouldRestartKanbanBoardStream(new Set(["board-1"]), "board-1")).toBe(true);
+    expect(shouldRestartKanbanBoardStream(new Set(["board-1"]), "board-2")).toBe(false);
+    expect(shouldRestartKanbanBoardStream(new Set(), "board-1")).toBe(false);
+  });
+
+  it("does not reconnect kanban board streams for the temporary unavailable stub", () => {
+    expect(
+      shouldReconnectFailedKanbanBoardStream(
+        Cause.fail(new Error(KANBAN_RPC_UNAVAILABLE_MESSAGE)),
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps kanban board stream reconnects for other failures", () => {
+    expect(shouldReconnectFailedKanbanBoardStream(Cause.fail(new Error("socket closed")))).toBe(
+      true,
+    );
+    expect(shouldReconnectFailedKanbanBoardStream(Cause.die("unexpected defect"))).toBe(true);
   });
 
   it("normalizes explicit websocket URLs to the RPC endpoint", () => {

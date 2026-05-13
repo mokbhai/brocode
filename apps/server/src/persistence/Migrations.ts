@@ -48,6 +48,9 @@ import Migration0032 from "./Migrations/032_ReconcileLegacyT3SchemaImport.ts";
 import Migration0033 from "./Migrations/033_ProjectionThreadsSidechatSource.ts";
 import Migration0034 from "./Migrations/034_AuthAccessManagement.ts";
 import Migration0035 from "./Migrations/035_NormalizeLegacyModelSelectionOptions.ts";
+import Migration0036 from "./Migrations/036_KanbanProjections.ts";
+import Migration0037 from "./Migrations/037_KanbanEventStoreAndTaskKeys.ts";
+import Migration0038 from "./Migrations/038_AutomationDomain.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -95,6 +98,9 @@ export const migrationEntries = [
   [33, "ProjectionThreadsSidechatSource", Migration0033],
   [34, "AuthAccessManagement", Migration0034],
   [35, "NormalizeLegacyModelSelectionOptions", Migration0035],
+  [36, "KanbanProjections", Migration0036],
+  [37, "KanbanEventStoreAndTaskKeys", Migration0037],
+  [38, "AutomationDomain", Migration0038],
 ] as const;
 
 export const makeMigrationLoader = (throughId?: number) =>

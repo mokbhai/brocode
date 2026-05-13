@@ -13,6 +13,9 @@ import {
   type ThreadId,
   type ThreadBrowserState,
   type GitActionProgressEvent,
+  KANBAN_WS_CHANNELS,
+  KANBAN_WS_METHODS,
+  type KanbanEvent,
   type OrchestrationEvent,
   type OrchestrationShellStreamItem,
   type OrchestrationThreadStreamItem,
@@ -49,6 +52,7 @@ const orchestrationShellEventListeners = new Set<(payload: OrchestrationShellStr
 const orchestrationThreadEventListeners = new Set<
   (payload: OrchestrationThreadStreamItem) => void
 >();
+const kanbanBoardEventListeners = new Set<(payload: KanbanEvent) => void>();
 const fallbackBrowserStateListeners = new Set<(state: ThreadBrowserState) => void>();
 const fallbackBrowserStates = new Map<ThreadId, ThreadBrowserState>();
 
@@ -390,6 +394,16 @@ export function createWsNativeApi(): NativeApi {
       }
     }
   });
+  transport.subscribe(KANBAN_WS_CHANNELS.boardEvent, (message) => {
+    const payload = message.data;
+    for (const listener of kanbanBoardEventListeners) {
+      try {
+        listener(payload);
+      } catch {
+        // Swallow listener errors
+      }
+    }
+  });
   const api: NativeApi = {
     dialogs: {
       pickFolder: async () => {
@@ -616,6 +630,22 @@ export function createWsNativeApi(): NativeApi {
         };
       },
     },
+    kanban: {
+      getSnapshot: (input) => transport.request(KANBAN_WS_METHODS.getSnapshot, input),
+      dispatchCommand: (command) =>
+        transport.request(KANBAN_WS_METHODS.dispatchCommand, {
+          command,
+        }),
+      subscribeBoard: (input) => transport.request<void>(KANBAN_WS_METHODS.subscribeBoard, input),
+      unsubscribeBoard: (input) =>
+        transport.request<void>(KANBAN_WS_METHODS.unsubscribeBoard, input),
+      onBoardEvent: (callback) => {
+        kanbanBoardEventListeners.add(callback);
+        return () => {
+          kanbanBoardEventListeners.delete(callback);
+        };
+      },
+    },
     browser: {
       open: async (input) => {
         if (window.desktopBridge) {
@@ -790,6 +820,7 @@ if (import.meta.hot) {
     orchestrationDomainEventListeners.clear();
     orchestrationShellEventListeners.clear();
     orchestrationThreadEventListeners.clear();
+    kanbanBoardEventListeners.clear();
     fallbackBrowserStateListeners.clear();
   });
 }

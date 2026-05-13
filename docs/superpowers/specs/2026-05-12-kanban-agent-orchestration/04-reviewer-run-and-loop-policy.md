@@ -8,7 +8,7 @@ Add reviewer runs and the bounded implementation-review loop.
 
 Add reviewer orchestration through existing provider architecture:
 
-- build reviewer prompt from spec, task list, diff/checkpoint summary, worker summary, and guardrail policy
+- build reviewer prompt from title, description/context, generated task list, diff/checkpoint summary, worker summary, and guardrail policy
 - dispatch reviewer through existing provider turn APIs
 - parse reviewer result as `approved`, `needs_work`, `blocked`, or `inconclusive`
 - create or update follow-up tasks from concrete reviewer findings
@@ -42,4 +42,3 @@ The loop should be server-owned. The UI can start or stop it, but the server dec
 - Parser tests for reviewer result handling.
 - Projector tests for run/review/task event replay.
 - Integration-style test for worker -> reviewer -> needs work -> worker -> reviewer -> approved.
-

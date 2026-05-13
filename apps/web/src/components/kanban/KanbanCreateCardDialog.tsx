@@ -1,0 +1,294 @@
+import {
+  DEFAULT_MODEL_BY_PROVIDER,
+  DEFAULT_RUNTIME_MODE,
+  PROVIDER_DISPLAY_NAMES,
+  type KanbanBoardSnapshot,
+  type ModelSelection,
+  type ProviderKind,
+  type RuntimeMode,
+  type ThreadId,
+} from "@t3tools/contracts";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Textarea } from "~/components/ui/textarea";
+
+import type { CreateKanbanCardInput } from "../../kanbanStore";
+import {
+  buildCreateKanbanCardInput,
+  createDefaultKanbanModelSelection,
+} from "./kanbanCreateCard.logic";
+
+const PROVIDER_OPTIONS: readonly ProviderKind[] = [
+  "codex",
+  "claudeAgent",
+  "cursor",
+  "gemini",
+  "opencode",
+];
+
+const RUNTIME_MODE_LABELS: Record<RuntimeMode, string> = {
+  "full-access": "Full access",
+  "approval-required": "Approval required",
+};
+
+export interface KanbanCreateCardDialogProps {
+  readonly snapshot: KanbanBoardSnapshot;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onCreateCard: (input: CreateKanbanCardInput) => Promise<void> | void;
+  readonly initialSourceThreadId?: ThreadId | null;
+  readonly initialTitle?: string;
+  readonly initialModelSelection?: ModelSelection | null;
+}
+
+function isProviderKind(value: string): value is ProviderKind {
+  return PROVIDER_OPTIONS.includes(value as ProviderKind);
+}
+
+function isRuntimeMode(value: string): value is RuntimeMode {
+  return value === "full-access" || value === "approval-required";
+}
+
+function Field(props: {
+  readonly label: string;
+  readonly children: ReactNode;
+  readonly hint?: string;
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-foreground">{props.label}</span>
+      {props.children}
+      {props.hint ? <span className="block text-xs text-muted-foreground">{props.hint}</span> : null}
+    </label>
+  );
+}
+
+export function KanbanCreateCardDialog({
+  snapshot,
+  open,
+  onOpenChange,
+  onCreateCard,
+  initialSourceThreadId = null,
+  initialTitle,
+  initialModelSelection = null,
+}: KanbanCreateCardDialogProps) {
+  const defaultModelSelection = useMemo(() => createDefaultKanbanModelSelection(), []);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [provider, setProvider] = useState<ProviderKind>(defaultModelSelection.provider);
+  const [model, setModel] = useState(defaultModelSelection.model);
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>(DEFAULT_RUNTIME_MODE);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const formErrorId = "kanban-create-card-error";
+  const initialSeed = [
+    initialSourceThreadId ?? "",
+    initialTitle ?? "",
+    initialModelSelection?.provider ?? "",
+    initialModelSelection?.model ?? "",
+  ].join("\u0000");
+  const appliedInitialSeedRef = useRef<string | null>(null);
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setProvider(defaultModelSelection.provider);
+    setModel(defaultModelSelection.model);
+    setRuntimeMode(DEFAULT_RUNTIME_MODE);
+    setError(null);
+  };
+
+  useEffect(() => {
+    if (!open || appliedInitialSeedRef.current === initialSeed) {
+      return;
+    }
+    appliedInitialSeedRef.current = initialSeed;
+    setTitle(initialTitle?.trim() ?? "");
+    setDescription("");
+    if (initialModelSelection) {
+      setProvider(initialModelSelection.provider);
+      setModel(initialModelSelection.model);
+    } else {
+      setProvider(defaultModelSelection.provider);
+      setModel(defaultModelSelection.model);
+    }
+    setRuntimeMode(DEFAULT_RUNTIME_MODE);
+    setError(null);
+  }, [
+    defaultModelSelection.model,
+    defaultModelSelection.provider,
+    initialModelSelection,
+    initialSeed,
+    initialSourceThreadId,
+    initialTitle,
+    open,
+  ]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const modelSelection = {
+        provider,
+        model: model.trim() || DEFAULT_MODEL_BY_PROVIDER[provider],
+      } satisfies ModelSelection;
+      await onCreateCard(
+        buildCreateKanbanCardInput({
+          boardId: snapshot.board.id,
+          projectId: snapshot.board.projectId,
+          title,
+          description,
+          sourceThreadId: initialSourceThreadId,
+          modelSelection,
+          runtimeMode,
+        }),
+      );
+      resetForm();
+      onOpenChange(false);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : String(submitError));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogPopup className="max-w-2xl">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Create Kanban card</DialogTitle>
+            <DialogDescription>
+              Add a card to {snapshot.board.title}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogPanel className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Runtime mode">
+                <Select
+                  value={runtimeMode}
+                  onValueChange={(value) => {
+                    if (isRuntimeMode(value)) {
+                      setRuntimeMode(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger aria-label="Runtime mode">
+                    <SelectValue>{RUNTIME_MODE_LABELS[runtimeMode]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    <SelectItem hideIndicator value="full-access">
+                      Full access
+                    </SelectItem>
+                    <SelectItem hideIndicator value="approval-required">
+                      Approval required
+                    </SelectItem>
+                  </SelectPopup>
+                </Select>
+              </Field>
+            </div>
+
+            <Field label="Title">
+              <Input
+                value={title}
+                onChange={(event) => setTitle(event.currentTarget.value)}
+                placeholder="Implement kanban orchestration"
+                nativeInput
+              />
+            </Field>
+
+            <Field label="Description">
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.currentTarget.value)}
+                placeholder="Optional context for the card"
+              />
+            </Field>
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+              <Field label="Provider">
+                <Select
+                  value={provider}
+                  onValueChange={(value) => {
+                    if (!isProviderKind(value)) {
+                      return;
+                    }
+                    setProvider(value);
+                    setModel(DEFAULT_MODEL_BY_PROVIDER[value]);
+                  }}
+                >
+                  <SelectTrigger aria-label="Provider">
+                    <SelectValue>{PROVIDER_DISPLAY_NAMES[provider]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {PROVIDER_OPTIONS.map((providerOption) => (
+                      <SelectItem hideIndicator key={providerOption} value={providerOption}>
+                        {PROVIDER_DISPLAY_NAMES[providerOption]}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </Field>
+
+              <Field label="Model">
+                <Input
+                  value={model}
+                  onChange={(event) => setModel(event.currentTarget.value)}
+                  placeholder={DEFAULT_MODEL_BY_PROVIDER[provider]}
+                  nativeInput
+                />
+              </Field>
+            </div>
+
+            {error ? (
+              <div
+                id={formErrorId}
+                role="alert"
+                aria-live="polite"
+                className="rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive-foreground"
+              >
+                {error}
+              </div>
+            ) : null}
+          </DialogPanel>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                resetForm();
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              Create card
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogPopup>
+    </Dialog>
+  );
+}
