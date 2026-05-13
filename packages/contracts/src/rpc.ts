@@ -38,6 +38,11 @@ import {
   GitSummarizeDiffResult,
 } from "./git";
 import { KeybindingRule } from "./keybindings";
+import {
+  AUTOMATION_WS_METHODS,
+  AutomationEvent,
+  AutomationRpcSchemas,
+} from "./automation";
 import { KANBAN_WS_METHODS, KanbanEvent, KanbanRpcSchemas } from "./kanban";
 import {
   ClientOrchestrationCommand,
@@ -242,6 +247,31 @@ export const WsKanbanSubscribeBoardRpc = Rpc.make(KANBAN_WS_METHODS.subscribeBoa
 export const WsKanbanUnsubscribeBoardRpc = Rpc.make(KANBAN_WS_METHODS.unsubscribeBoard, {
   payload: KanbanRpcSchemas.unsubscribeBoard.input,
   success: KanbanRpcSchemas.unsubscribeBoard.output,
+  error: WsRpcError,
+});
+
+export const WsAutomationGetSnapshotRpc = Rpc.make(AUTOMATION_WS_METHODS.getSnapshot, {
+  payload: AutomationRpcSchemas.getSnapshot.input,
+  success: AutomationRpcSchemas.getSnapshot.output,
+  error: WsRpcError,
+});
+
+export const WsAutomationDispatchCommandRpc = Rpc.make(AUTOMATION_WS_METHODS.dispatchCommand, {
+  payload: AutomationRpcSchemas.dispatchCommand.input,
+  success: AutomationRpcSchemas.dispatchCommand.output,
+  error: WsRpcError,
+});
+
+export const WsAutomationSubscribeRpc = Rpc.make(AUTOMATION_WS_METHODS.subscribe, {
+  payload: AutomationRpcSchemas.subscribe.input,
+  success: AutomationEvent,
+  error: WsRpcError,
+  stream: true,
+});
+
+export const WsAutomationUnsubscribeRpc = Rpc.make(AUTOMATION_WS_METHODS.unsubscribe, {
+  payload: AutomationRpcSchemas.unsubscribe.input,
+  success: AutomationRpcSchemas.unsubscribe.output,
   error: WsRpcError,
 });
 
@@ -612,6 +642,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsKanbanStartWorkerRunRpc,
   WsKanbanSubscribeBoardRpc,
   WsKanbanUnsubscribeBoardRpc,
+  WsAutomationGetSnapshotRpc,
+  WsAutomationDispatchCommandRpc,
+  WsAutomationSubscribeRpc,
+  WsAutomationUnsubscribeRpc,
   WsProjectsListDirectoriesRpc,
   WsProjectsSearchEntriesRpc,
   WsProjectsSearchLocalEntriesRpc,
