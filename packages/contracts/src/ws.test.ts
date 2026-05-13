@@ -119,6 +119,23 @@ it.effect("accepts kanban.dispatchCommand requests with a client command envelop
   }),
 );
 
+it.effect("accepts kanban.startWorkerRun requests", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decode(WebSocketRequest, {
+      id: "req-kanban-worker-1",
+      body: {
+        _tag: KANBAN_WS_METHODS.startWorkerRun,
+        cardId: "card_1",
+      },
+    });
+
+    assert.strictEqual(parsed.body._tag, KANBAN_WS_METHODS.startWorkerRun);
+    if (parsed.body._tag === KANBAN_WS_METHODS.startWorkerRun) {
+      assert.strictEqual(parsed.body.cardId, "card_1");
+    }
+  }),
+);
+
 it.effect("accepts kanban.boardEvent push envelopes", () =>
   Effect.gen(function* () {
     const parsed = yield* decode(WsResponse, {

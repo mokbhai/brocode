@@ -13,6 +13,7 @@ import { ModelSelection, RuntimeMode } from "./orchestration";
 export const KANBAN_WS_METHODS = {
   getSnapshot: "kanban.getSnapshot",
   dispatchCommand: "kanban.dispatchCommand",
+  startWorkerRun: "kanban.startWorkerRun",
   subscribeBoard: "kanban.subscribeBoard",
   unsubscribeBoard: "kanban.unsubscribeBoard",
 } as const;
@@ -212,6 +213,17 @@ export const KanbanDispatchCommandResult = Schema.Struct({
   sequence: NonNegativeInt,
 });
 export type KanbanDispatchCommandResult = typeof KanbanDispatchCommandResult.Type;
+
+export const KanbanStartWorkerRunInput = Schema.Struct({
+  cardId: KanbanCardId,
+});
+export type KanbanStartWorkerRunInput = typeof KanbanStartWorkerRunInput.Type;
+
+export const KanbanStartWorkerRunResult = Schema.Struct({
+  runId: KanbanRunId,
+  threadId: ThreadId,
+});
+export type KanbanStartWorkerRunResult = typeof KanbanStartWorkerRunResult.Type;
 
 export const KanbanSubscribeBoardInput = Schema.Struct({
   boardId: KanbanBoardId,
@@ -484,6 +496,10 @@ export const KanbanRpcSchemas = {
   dispatchCommand: {
     input: ClientKanbanCommand,
     output: KanbanDispatchCommandResult,
+  },
+  startWorkerRun: {
+    input: KanbanStartWorkerRunInput,
+    output: KanbanStartWorkerRunResult,
   },
   subscribeBoard: {
     input: KanbanSubscribeBoardInput,

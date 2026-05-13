@@ -15,6 +15,8 @@ import {
   KanbanGetSnapshotInput,
   KanbanReadModel,
   KanbanRpcSchemas,
+  KanbanStartWorkerRunInput,
+  KanbanStartWorkerRunResult,
   KanbanSubscribeBoardInput,
   KanbanUnsubscribeBoardInput,
 } from "./kanban";
@@ -27,6 +29,8 @@ const decodeKanbanRpcDispatchInput = Schema.decodeUnknownEffect(
 );
 const decodeKanbanGetSnapshotInput = Schema.decodeUnknownEffect(KanbanGetSnapshotInput);
 const decodeKanbanDispatchCommandResult = Schema.decodeUnknownEffect(KanbanDispatchCommandResult);
+const decodeKanbanStartWorkerRunInput = Schema.decodeUnknownEffect(KanbanStartWorkerRunInput);
+const decodeKanbanStartWorkerRunResult = Schema.decodeUnknownEffect(KanbanStartWorkerRunResult);
 const decodeKanbanSubscribeBoardInput = Schema.decodeUnknownEffect(KanbanSubscribeBoardInput);
 const decodeKanbanUnsubscribeBoardInput = Schema.decodeUnknownEffect(KanbanUnsubscribeBoardInput);
 const decodeKanbanEvent = Schema.decodeUnknownEffect(KanbanEvent);
@@ -508,6 +512,7 @@ it("exports Kanban websocket method and channel names", () => {
   assert.deepStrictEqual(KANBAN_WS_METHODS, {
     getSnapshot: "kanban.getSnapshot",
     dispatchCommand: "kanban.dispatchCommand",
+    startWorkerRun: "kanban.startWorkerRun",
     subscribeBoard: "kanban.subscribeBoard",
     unsubscribeBoard: "kanban.unsubscribeBoard",
   });
@@ -528,6 +533,18 @@ it.effect("decodes Kanban RPC schemas keyed by websocket methods", () =>
     });
     assert.strictEqual(receipt.sequence, 1);
 
+    const workerRunInput = yield* decodeKanbanStartWorkerRunInput({
+      cardId: "card-1",
+    });
+    assert.strictEqual(workerRunInput.cardId, "card-1");
+
+    const workerRunResult = yield* decodeKanbanStartWorkerRunResult({
+      runId: "run-1",
+      threadId: "thread-worker-1",
+    });
+    assert.strictEqual(workerRunResult.runId, "run-1");
+    assert.strictEqual(workerRunResult.threadId, "thread-worker-1");
+
     const subscribeInput = yield* decodeKanbanSubscribeBoardInput({
       boardId: "board-1",
     });
@@ -543,6 +560,8 @@ it.effect("decodes Kanban RPC schemas keyed by websocket methods", () =>
     assert.strictEqual(KanbanRpcSchemas.dispatchCommand.input, ClientKanbanCommand);
     assert.strictEqual(KanbanClientCommand, ClientKanbanCommand);
     assert.strictEqual(KanbanRpcSchemas.dispatchCommand.output, KanbanDispatchCommandResult);
+    assert.strictEqual(KanbanRpcSchemas.startWorkerRun.input, KanbanStartWorkerRunInput);
+    assert.strictEqual(KanbanRpcSchemas.startWorkerRun.output, KanbanStartWorkerRunResult);
     assert.strictEqual(KanbanRpcSchemas.subscribeBoard.input, KanbanSubscribeBoardInput);
     assert.strictEqual(KanbanRpcSchemas.unsubscribeBoard.input, KanbanUnsubscribeBoardInput);
     assert.deepStrictEqual(Object.keys(KanbanRpcSchemas), Object.keys(KANBAN_WS_METHODS));

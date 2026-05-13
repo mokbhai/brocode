@@ -198,6 +198,7 @@ const WebSocketRequestBody = Schema.Union([
     KANBAN_WS_METHODS.dispatchCommand,
     Schema.Struct({ command: KanbanRpcSchemas.dispatchCommand.input }),
   ),
+  tagRequestBody(KANBAN_WS_METHODS.startWorkerRun, KanbanRpcSchemas.startWorkerRun.input),
   tagRequestBody(KANBAN_WS_METHODS.subscribeBoard, KanbanRpcSchemas.subscribeBoard.input),
   tagRequestBody(KANBAN_WS_METHODS.unsubscribeBoard, KanbanRpcSchemas.unsubscribeBoard.input),
 

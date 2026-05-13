@@ -226,6 +226,12 @@ export const WsKanbanDispatchCommandRpc = Rpc.make(KANBAN_WS_METHODS.dispatchCom
   error: WsRpcError,
 });
 
+export const WsKanbanStartWorkerRunRpc = Rpc.make(KANBAN_WS_METHODS.startWorkerRun, {
+  payload: KanbanRpcSchemas.startWorkerRun.input,
+  success: KanbanRpcSchemas.startWorkerRun.output,
+  error: WsRpcError,
+});
+
 export const WsKanbanSubscribeBoardRpc = Rpc.make(KANBAN_WS_METHODS.subscribeBoard, {
   payload: KanbanRpcSchemas.subscribeBoard.input,
   success: KanbanEvent,
@@ -603,6 +609,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationSubscribeDomainEventsRpc,
   WsKanbanGetSnapshotRpc,
   WsKanbanDispatchCommandRpc,
+  WsKanbanStartWorkerRunRpc,
   WsKanbanSubscribeBoardRpc,
   WsKanbanUnsubscribeBoardRpc,
   WsProjectsListDirectoriesRpc,

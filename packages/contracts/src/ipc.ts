@@ -124,6 +124,8 @@ import type {
   KanbanDispatchCommandResult,
   KanbanEvent,
   KanbanGetSnapshotInput,
+  KanbanStartWorkerRunInput,
+  KanbanStartWorkerRunResult,
   KanbanSubscribeBoardInput,
   KanbanUnsubscribeBoardInput,
 } from "./kanban";
@@ -458,6 +460,7 @@ export interface NativeApi {
   kanban: {
     getSnapshot: (input: KanbanGetSnapshotInput) => Promise<KanbanBoardSnapshot>;
     dispatchCommand: (command: ClientKanbanCommand) => Promise<KanbanDispatchCommandResult>;
+    startWorkerRun: (input: KanbanStartWorkerRunInput) => Promise<KanbanStartWorkerRunResult>;
     subscribeBoard: (input: KanbanSubscribeBoardInput) => Promise<void>;
     unsubscribeBoard: (input: KanbanUnsubscribeBoardInput) => Promise<void>;
     onBoardEvent: (callback: (event: KanbanEvent) => void) => () => void;
