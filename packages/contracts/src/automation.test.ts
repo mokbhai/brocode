@@ -311,6 +311,8 @@ it.effect("decodes automation websocket event pushes", () =>
 );
 
 it("defines automation rpc methods", () => {
-  assert.strictEqual(AutomationRpcSchemas.getSnapshot.input !== undefined, true);
-  assert.strictEqual(AutomationRpcSchemas.dispatchCommand.input !== undefined, true);
+  for (const method of ["getSnapshot", "dispatchCommand", "subscribe", "unsubscribe"] as const) {
+    assert.strictEqual(AutomationRpcSchemas[method].input !== undefined, true);
+    assert.strictEqual(AutomationRpcSchemas[method].output !== undefined, true);
+  }
 });
