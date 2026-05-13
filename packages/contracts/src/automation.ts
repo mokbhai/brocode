@@ -29,6 +29,9 @@ export type AutomationRunId = typeof AutomationRunId.Type;
 export const AutomationStatus = Schema.Literals(["enabled", "disabled", "deleted"]);
 export type AutomationStatus = typeof AutomationStatus.Type;
 
+export const AutomationClientSettableStatus = Schema.Literals(["enabled", "disabled"]);
+export type AutomationClientSettableStatus = typeof AutomationClientSettableStatus.Type;
+
 export const AutomationRunStatus = Schema.Literals([
   "pending",
   "running",
@@ -38,6 +41,14 @@ export const AutomationRunStatus = Schema.Literals([
   "cancelled",
 ]);
 export type AutomationRunStatus = typeof AutomationRunStatus.Type;
+
+export const AutomationRunTerminalStatus = Schema.Literals([
+  "completed",
+  "failed",
+  "skipped",
+  "cancelled",
+]);
+export type AutomationRunTerminalStatus = typeof AutomationRunTerminalStatus.Type;
 
 export const AutomationRunTrigger = Schema.Literals(["scheduled", "startup-recovery", "manual"]);
 export type AutomationRunTrigger = typeof AutomationRunTrigger.Type;
@@ -64,6 +75,7 @@ const NullableThreadId = Schema.optional(Schema.NullOr(ThreadId)).pipe(
 const NullableIsoDateTime = Schema.optional(Schema.NullOr(IsoDateTime)).pipe(
   Schema.withDecodingDefault(() => null),
 );
+const OptionalNullableIsoDateTime = Schema.optional(Schema.NullOr(IsoDateTime));
 const NullableTrimmedString = Schema.optional(Schema.NullOr(TrimmedNonEmptyString)).pipe(
   Schema.withDecodingDefault(() => null),
 );
@@ -162,6 +174,27 @@ export const AutomationRun = Schema.Struct({
 });
 export type AutomationRun = typeof AutomationRun.Type;
 
+export const AutomationCompletedRun = Schema.Struct({
+  id: AutomationRunId,
+  automationId: AutomationId,
+  status: AutomationRunTerminalStatus,
+  trigger: AutomationRunTrigger,
+  resultThreadId: NullableThreadId,
+  orchestrationCommandIds: Schema.optional(Schema.Array(CommandId)).pipe(
+    Schema.withDecodingDefault(() => []),
+  ),
+  startedAt: NullableIsoDateTime,
+  completedAt: IsoDateTime,
+  errorMessage: NullableTrimmedString,
+  skippedReason: NullableTrimmedString,
+  changedFiles: Schema.optional(Schema.Array(TrimmedNonEmptyString)).pipe(
+    Schema.withDecodingDefault(() => []),
+  ),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export type AutomationCompletedRun = typeof AutomationCompletedRun.Type;
+
 export const AutomationReadModel = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   updatedAt: IsoDateTime,
@@ -229,14 +262,14 @@ export const AutomationClientCommand = Schema.Union([
     runtimeMode: Schema.optional(RuntimeMode),
     writesEnabled: Schema.optional(Schema.Boolean),
     allowDirtyLocalCheckout: Schema.optional(Schema.Boolean),
-    nextRunAt: NullableIsoDateTime,
+    nextRunAt: OptionalNullableIsoDateTime,
     updatedAt: IsoDateTime,
   }),
   Schema.Struct({
     type: Schema.Literal("automation.status.set"),
     commandId: CommandId,
     automationId: AutomationId,
-    status: AutomationStatus,
+    status: AutomationClientSettableStatus,
     updatedAt: IsoDateTime,
   }),
   Schema.Struct({
@@ -276,7 +309,7 @@ export const AutomationInternalCommand = Schema.Union([
     commandId: CommandId,
     runId: AutomationRunId,
     automationId: AutomationId,
-    status: AutomationRunStatus,
+    status: AutomationRunTerminalStatus,
     errorMessage: NullableTrimmedString,
     skippedReason: NullableTrimmedString,
     changedFiles: Schema.Array(TrimmedNonEmptyString),
@@ -323,8 +356,8 @@ export const AutomationEvent = Schema.Union([
     type: Schema.Literal("automation.status-changed"),
     payload: Schema.Struct({
       automationId: AutomationId,
-      fromStatus: AutomationStatus,
-      toStatus: AutomationStatus,
+      fromStatus: AutomationClientSettableStatus,
+      toStatus: AutomationClientSettableStatus,
       updatedAt: IsoDateTime,
     }),
   }),
@@ -354,7 +387,7 @@ export const AutomationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("automation.run-completed"),
     payload: Schema.Struct({
-      run: AutomationRun,
+      run: AutomationCompletedRun,
     }),
   }),
 ]);
