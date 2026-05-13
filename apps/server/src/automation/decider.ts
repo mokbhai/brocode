@@ -146,6 +146,7 @@ function buildAutomation(
     resultThreadId: null,
     nextRunAt: command.nextRunAt,
     lastRunAt: null,
+    deletedAt: null,
     createdAt: command.createdAt,
     updatedAt: command.createdAt,
   };
@@ -236,7 +237,7 @@ export const decideAutomationCommand = Effect.fn("decideAutomationCommand")(func
   switch (command.type) {
     case "automation.create": {
       const existing = findAutomation(readModel, command.automationId);
-      if (existing !== undefined && existing.status !== "deleted") {
+      if (existing !== undefined) {
         return yield* fail(command, `Automation '${command.automationId}' already exists.`);
       }
       return {
