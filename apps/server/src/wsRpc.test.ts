@@ -1,8 +1,11 @@
 import {
+  AutomationId,
   CommandId,
   KanbanBoardId,
   KanbanCardId,
   ProjectId,
+  type AutomationCommand,
+  type AutomationEvent,
   type KanbanCommand,
   type KanbanEvent,
 } from "@t3tools/contracts";
@@ -10,7 +13,13 @@ import { Effect, Layer, ManagedRuntime, Queue, Stream } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { SqlitePersistenceMemory } from "./persistence/Layers/Sqlite.ts";
-import { makeKanbanWsHandlers } from "./wsRpc.ts";
+import { makeAutomationWsHandlers, makeKanbanWsHandlers } from "./wsRpc.ts";
+import { AutomationEngineLive } from "./automation/Layers/AutomationEngine.ts";
+import { AutomationEventStoreLive } from "./automation/Layers/AutomationEventStore.ts";
+import { AutomationProjectionPipelineLive } from "./automation/Layers/AutomationProjectionPipeline.ts";
+import { AutomationSnapshotQueryLive } from "./automation/Layers/AutomationSnapshotQuery.ts";
+import { AutomationEngineService } from "./automation/Services/AutomationEngine.ts";
+import { AutomationSnapshotQuery } from "./automation/Services/AutomationSnapshotQuery.ts";
 import { KanbanEngineLive } from "./kanban/Layers/KanbanEngine.ts";
 import { KanbanEventStoreLive } from "./kanban/Layers/KanbanEventStore.ts";
 import { KanbanProjectionPipelineLive } from "./kanban/Layers/KanbanProjectionPipeline.ts";
@@ -22,6 +31,8 @@ const projectId = ProjectId.makeUnsafe("project-kanban-ws");
 const boardId = KanbanBoardId.makeUnsafe("board-kanban-ws");
 const otherBoardId = KanbanBoardId.makeUnsafe("board-kanban-ws-other");
 const cardId = KanbanCardId.makeUnsafe("card-kanban-ws");
+const automationProjectId = ProjectId.makeUnsafe("project-automation-ws");
+const automationId = AutomationId.makeUnsafe("automation-ws");
 
 function boardCreate(commandId: string, targetBoardId = boardId): KanbanCommand {
   return {
@@ -66,6 +77,53 @@ async function createKanbanRpcSystem() {
   );
   return {
     handlers: makeKanbanWsHandlers({ kanbanEngine: engine, kanbanSnapshotQuery: snapshotQuery }),
+    run: <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(effect),
+    dispose: () => runtime.dispose(),
+  };
+}
+
+function automationCreate(commandId: string, createdAt: string): AutomationCommand {
+  return {
+    type: "automation.create",
+    commandId: CommandId.makeUnsafe(commandId),
+    automationId,
+    title: "Automation WS digest",
+    prompt: "Summarize project activity.",
+    target: { type: "project", projectId: automationProjectId },
+    schedule: { kind: "daily", hour: 9, minute: 0 },
+    timezone: "Asia/Kolkata",
+    environmentMode: "local",
+    modelSelection: { provider: "codex", model: "gpt-5.2" },
+    runtimeMode: "full-access",
+    writesEnabled: true,
+    allowDirtyLocalCheckout: false,
+    nextRunAt: createdAt,
+    createdAt,
+  };
+}
+
+async function createAutomationRpcSystem() {
+  const projectionLayer = AutomationProjectionPipelineLive.pipe(
+    Layer.provide(AutomationEventStoreLive),
+  );
+  const automationLayer = AutomationEngineLive.pipe(
+    Layer.provide(Layer.mergeAll(AutomationEventStoreLive, projectionLayer)),
+  );
+  const layer = Layer.mergeAll(automationLayer, AutomationSnapshotQueryLive).pipe(
+    Layer.provideMerge(SqlitePersistenceMemory),
+  );
+  const runtime = ManagedRuntime.make(layer);
+  const engine = await runtime.runPromise(Effect.service(AutomationEngineService));
+  const snapshotQuery = await runtime.runPromise(
+    Effect.gen(function* () {
+      return yield* AutomationSnapshotQuery;
+    }),
+  );
+  return {
+    handlers: makeAutomationWsHandlers({
+      automationEngine: engine,
+      automationSnapshotQuery: snapshotQuery,
+    }),
     run: <A, E>(effect: Effect.Effect<A, E>) => runtime.runPromise(effect),
     dispose: () => runtime.dispose(),
   };
@@ -148,6 +206,54 @@ describe("Kanban WebSocket RPC handlers", () => {
       "kanban.board.created",
       "kanban.card.created",
     ]);
+
+    await system.dispose();
+  });
+});
+
+describe("Automation WebSocket RPC handlers", () => {
+  it("dispatches commands, reads snapshots, and streams automation history plus hot events", async () => {
+    const system = await createAutomationRpcSystem();
+    const createdAt = "2026-05-13T00:20:00.000Z";
+
+    await system.run(
+      system.handlers["automation.dispatchCommand"](
+        automationCreate("cmd-automation-ws-create", createdAt),
+      ),
+    );
+
+    const snapshot = await system.run(system.handlers["automation.getSnapshot"]({}));
+    expect(snapshot.automations.map((automation) => automation.id)).toEqual([automationId]);
+    expect(snapshot.automations[0]).toMatchObject({
+      environmentMode: "local",
+      writePolicy: { writesEnabled: true, allowDirtyLocalCheckout: false },
+    });
+    expect(snapshot.runsByAutomationId[automationId]).toEqual([]);
+
+    const streamedTypes: string[] = [];
+    await system.run(
+      Effect.gen(function* () {
+        const queue = yield* Queue.unbounded<AutomationEvent>();
+        yield* Effect.forkScoped(
+          Stream.take(system.handlers["automation.subscribe"]({}), 2).pipe(
+            Stream.runForEach((event) => Queue.offer(queue, event).pipe(Effect.asVoid)),
+          ),
+        );
+
+        streamedTypes.push((yield* Queue.take(queue)).type);
+        yield* system.handlers["automation.dispatchCommand"]({
+          type: "automation.status.set",
+          commandId: CommandId.makeUnsafe("cmd-automation-ws-status"),
+          automationId,
+          status: "disabled",
+          updatedAt: "2026-05-13T00:21:00.000Z",
+        });
+        streamedTypes.push((yield* Queue.take(queue)).type);
+      }).pipe(Effect.scoped),
+    );
+
+    expect(streamedTypes).toEqual(["automation.created", "automation.status-changed"]);
+    await system.run(system.handlers["automation.unsubscribe"]({}));
 
     await system.dispose();
   });

@@ -29,6 +29,7 @@ import { WorkspaceLayerLive } from "./workspace/runtimeLayer";
 import { ProjectFaviconResolverLive } from "./project/Layers/ProjectFaviconResolver";
 import { ServerEnvironmentLive } from "./environment/Layers/ServerEnvironment";
 import { KanbanLayerLive } from "./kanban/runtimeLayer";
+import { AutomationLayerLive } from "./automation/runtimeLayer";
 
 export { makeServerProviderLayer } from "./provider/runtimeLayer";
 
@@ -43,6 +44,7 @@ export function makeServerRuntimeServicesLayer() {
   const runtimeServicesLayer = Layer.mergeAll(
     OrchestrationLayerLive,
     KanbanLayerLive,
+    AutomationLayerLive,
     checkpointStoreLayer,
     checkpointDiffQueryLayer,
     RuntimeReceiptBusLive,
