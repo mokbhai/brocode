@@ -47,6 +47,7 @@ import {
   ProviderInteractionMode,
   type ServerVoiceTranscriptionInput,
   type ServerVoiceTranscriptionResult,
+  type UserInputQuestion,
 } from "@t3tools/contracts";
 import { readActiveCodexProviderEnvKey } from "@t3tools/shared/codexConfig";
 import { normalizeModelSlug } from "@t3tools/shared/model";
@@ -94,6 +95,7 @@ interface PendingUserInputRequest {
   threadId: ThreadId;
   turnId?: TurnId;
   itemId?: ProviderItemId;
+  questions?: ReadonlyArray<UserInputQuestion>;
 }
 
 interface CodexUserInputAnswer {
@@ -387,6 +389,53 @@ function asObject(value: unknown): Record<string, unknown> | undefined {
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function asArray(value: unknown): ReadonlyArray<unknown> | undefined {
+  return Array.isArray(value) ? value : undefined;
+}
+
+function parseCodexUserInputQuestions(
+  payload: Record<string, unknown> | undefined,
+): ReadonlyArray<UserInputQuestion> | undefined {
+  const questions = asArray(payload?.questions);
+  if (!questions) {
+    return undefined;
+  }
+
+  const parsedQuestions = questions
+    .map((entry) => {
+      const question = asObject(entry);
+      if (!question) return undefined;
+      const options = asArray(question.options)
+        ?.map((option) => {
+          const optionRecord = asObject(option);
+          if (!optionRecord) return undefined;
+          const label = asString(optionRecord.label)?.trim();
+          const description = asString(optionRecord.description)?.trim();
+          if (!label || !description) {
+            return undefined;
+          }
+          return { label, description };
+        })
+        .filter((option): option is { label: string; description: string } => option !== undefined);
+      const id = asString(question.id)?.trim();
+      const header = asString(question.header)?.trim();
+      const prompt = asString(question.question)?.trim();
+      if (!id || !header || !prompt || !options || options.length === 0) {
+        return undefined;
+      }
+      return {
+        id,
+        header,
+        question: prompt,
+        options,
+        ...(typeof question.multiSelect === "boolean" ? { multiSelect: question.multiSelect } : {}),
+      };
+    })
+    .filter((question): question is UserInputQuestion => question !== undefined);
+
+  return parsedQuestions.length > 0 ? parsedQuestions : undefined;
 }
 
 export function buildCodexProcessEnv(
@@ -808,7 +857,24 @@ function buildCodexCollaborationMode(input: {
   };
 }
 
-function toCodexUserInputAnswer(value: unknown): CodexUserInputAnswer {
+function toDefaultCodexUserInputAnswer(
+  question: UserInputQuestion | undefined,
+): CodexUserInputAnswer | undefined {
+  const defaultAnswer = question?.options[0]?.label.trim();
+  return defaultAnswer ? { answers: [defaultAnswer] } : undefined;
+}
+
+function toCodexUserInputAnswer(
+  value: unknown,
+  question: UserInputQuestion | undefined,
+): CodexUserInputAnswer {
+  if (value === null || value === undefined) {
+    const defaultAnswer = toDefaultCodexUserInputAnswer(question);
+    if (defaultAnswer) {
+      return defaultAnswer;
+    }
+  }
+
   if (typeof value === "string") {
     return { answers: [value] };
   }
@@ -831,11 +897,13 @@ function toCodexUserInputAnswer(value: unknown): CodexUserInputAnswer {
 
 function toCodexUserInputAnswers(
   answers: ProviderUserInputAnswers,
+  questions: ReadonlyArray<UserInputQuestion> | undefined,
 ): Record<string, CodexUserInputAnswer> {
+  const questionsById = new Map(questions?.map((question) => [question.id, question]));
   return Object.fromEntries(
     Object.entries(answers).map(([questionId, value]) => [
       questionId,
-      toCodexUserInputAnswer(value),
+      toCodexUserInputAnswer(value, questionsById.get(questionId)),
     ]),
   );
 }
@@ -1775,14 +1843,14 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
       throw new Error(`Unknown pending user input request: ${requestId}`);
     }
 
-    context.pendingUserInputs.delete(requestId);
-    const codexAnswers = toCodexUserInputAnswers(answers);
+    const codexAnswers = toCodexUserInputAnswers(answers, pendingRequest.questions);
     this.writeMessage(context, {
       id: pendingRequest.jsonRpcId,
       result: {
         answers: codexAnswers,
       },
     });
+    context.pendingUserInputs.delete(requestId);
 
     this.emitEvent({
       id: EventId.makeUnsafe(randomUUID()),
@@ -2554,12 +2622,14 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
 
     if (request.method === "item/tool/requestUserInput") {
       requestId = ApprovalRequestId.makeUnsafe(randomUUID());
+      const questions = parseCodexUserInputQuestions(asObject(request.params));
       context.pendingUserInputs.set(requestId, {
         requestId,
         jsonRpcId: request.id,
         threadId: context.session.threadId,
         ...(rawRoute.turnId ? { turnId: rawRoute.turnId } : {}),
         ...(rawRoute.itemId ? { itemId: rawRoute.itemId } : {}),
+        ...(questions ? { questions } : {}),
       });
     }
 

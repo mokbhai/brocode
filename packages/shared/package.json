@@ -52,6 +52,10 @@
       "types": "./src/serverSettings.ts",
       "import": "./src/serverSettings.ts"
     },
+    "./providerStartOptions": {
+      "types": "./src/providerStartOptions.ts",
+      "import": "./src/providerStartOptions.ts"
+    },
     "./terminalThreads": {
       "types": "./src/terminalThreads.ts",
       "import": "./src/terminalThreads.ts"

@@ -16,6 +16,7 @@ import { startExternalBrowserRuntime, stopExternalBrowserRuntime } from "./exter
 import { patchBunWebSocketCloseEventCompatibility } from "./bunWebSocketCompatibility";
 import { makeEffectHttpRouteLayer } from "./http";
 import { Keybindings } from "./keybindings";
+import { KanbanWorkerCoordinator } from "./kanban/Services/KanbanWorkerCoordinator";
 import { OrchestrationReactor } from "./orchestration/Services/OrchestrationReactor";
 import { ThreadDeletionReactor } from "./orchestration/Services/ThreadDeletionReactor";
 import { ProviderSessionReaper } from "./provider/Services/ProviderSessionReaper";
@@ -34,6 +35,7 @@ export interface ServerShape {
     | FileSystem.FileSystem
     | Path.Path
     | Keybindings
+    | KanbanWorkerCoordinator
     | ServerLifecycleEvents
     | OrchestrationReactor
     | ProviderSessionReaper
@@ -57,6 +59,7 @@ export class ServerLifecycleError extends Schema.TaggedErrorClass<ServerLifecycl
 export const createEffectServer = Effect.fn(function* () {
   const config = yield* ServerConfig;
   const keybindings = yield* Keybindings;
+  const kanbanWorkerCoordinator = yield* KanbanWorkerCoordinator;
   const lifecycleEvents = yield* ServerLifecycleEvents;
   const orchestrationReactor = yield* OrchestrationReactor;
   const providerSessionReaper = yield* ProviderSessionReaper;
@@ -143,6 +146,7 @@ export const createEffectServer = Effect.fn(function* () {
   yield* Scope.provide(orchestrationReactor.start, subscriptionsScope);
   yield* Scope.provide(threadDeletionReactor.start(), subscriptionsScope);
   yield* Scope.provide(providerSessionReaper.start(), subscriptionsScope);
+  yield* Scope.provide(kanbanWorkerCoordinator.start(), subscriptionsScope);
   yield* readiness.markOrchestrationSubscriptionsReady;
   yield* readiness.markTerminalSubscriptionsReady;
   yield* runtimeStartup.markCommandReady;

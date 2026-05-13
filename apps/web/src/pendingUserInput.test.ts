@@ -11,6 +11,29 @@ import {
 } from "./pendingUserInput";
 
 describe("resolvePendingUserInputAnswer", () => {
+  it("uses the first single-select option when no draft answer exists", () => {
+    expect(
+      resolvePendingUserInputAnswer(
+        {
+          id: "scope",
+          header: "Scope",
+          question: "What should the plan target first?",
+          options: [
+            {
+              label: "Renderer first (Recommended)",
+              description: "Fix the visible submit path first",
+            },
+            {
+              label: "Server first",
+              description: "Harden provider handling first",
+            },
+          ],
+        },
+        undefined,
+      ),
+    ).toBe("Renderer first (Recommended)");
+  });
+
   it("prefers a custom answer over a selected option", () => {
     expect(
       resolvePendingUserInputAnswer(
@@ -106,6 +129,29 @@ describe("togglePendingUserInputOptionSelection", () => {
 });
 
 describe("buildPendingUserInputAnswers", () => {
+  it("includes default single-select answers for untouched prompts", () => {
+    expect(
+      buildPendingUserInputAnswers(
+        [
+          {
+            id: "scope",
+            header: "Scope",
+            question: "What should the plan target first?",
+            options: [
+              {
+                label: "Renderer first (Recommended)",
+                description: "Fix the visible submit path first",
+              },
+            ],
+          },
+        ],
+        {},
+      ),
+    ).toEqual({
+      scope: "Renderer first (Recommended)",
+    });
+  });
+
   it("returns a canonical answer map for complete prompts", () => {
     expect(
       buildPendingUserInputAnswers(
@@ -148,7 +194,7 @@ describe("buildPendingUserInputAnswers", () => {
     });
   });
 
-  it("returns null when any question is unanswered", () => {
+  it("returns null when any multi-select question is unanswered", () => {
     expect(
       buildPendingUserInputAnswers(
         [
@@ -156,6 +202,7 @@ describe("buildPendingUserInputAnswers", () => {
             id: "scope",
             header: "Scope",
             question: "What should the plan target first?",
+            multiSelect: true,
             options: [
               {
                 label: "Orchestration-first",
@@ -196,24 +243,21 @@ describe("pending user input question progress", () => {
     },
   ] as const;
 
-  it("counts only answered questions", () => {
-    expect(
-      countAnsweredPendingUserInputQuestions(questions, {
-        scope: {
-          selectedOptionLabels: ["Orchestration-first"],
-        },
-      }),
-    ).toBe(1);
+  it("counts default single-select options as answered", () => {
+    expect(countAnsweredPendingUserInputQuestions(questions, {})).toBe(2);
   });
 
-  it("finds the first unanswered question", () => {
-    expect(
-      findFirstUnansweredPendingUserInputQuestionIndex(questions, {
-        scope: {
-          selectedOptionLabels: ["Orchestration-first"],
-        },
-      }),
-    ).toBe(1);
+  it("finds the first unanswered multi-select question", () => {
+    const questionsWithRequiredMultiSelect = [
+      questions[0],
+      {
+        ...questions[1],
+        multiSelect: true,
+      },
+    ] as const;
+
+    expect(findFirstUnansweredPendingUserInputQuestionIndex(questionsWithRequiredMultiSelect, {}))
+      .toBe(1);
   });
 
   it("returns the last question index when all answers are complete", () => {
@@ -246,9 +290,9 @@ describe("pending user input question progress", () => {
       selectedOptionLabels: ["Orchestration-first"],
       customAnswer: "",
       resolvedAnswer: "Orchestration-first",
-      answeredQuestionCount: 1,
+      answeredQuestionCount: 2,
       isLastQuestion: false,
-      isComplete: false,
+      isComplete: true,
       canAdvance: true,
     });
   });

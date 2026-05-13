@@ -1947,6 +1947,87 @@ describe("respondToUserInput", () => {
     );
   });
 
+  it("does not consume the pending callback when answer conversion fails", async () => {
+    const { manager, context, writeMessage, emitEvent } = createPendingUserInputHarness();
+
+    await expect(
+      manager.respondToUserInput(
+        asThreadId("thread_1"),
+        ApprovalRequestId.makeUnsafe("req-user-input-1"),
+        {
+          scope: null,
+        },
+      ),
+    ).rejects.toThrow("User input answers must be strings or arrays of strings.");
+
+    expect(context.pendingUserInputs.has(ApprovalRequestId.makeUnsafe("req-user-input-1"))).toBe(
+      true,
+    );
+    expect(writeMessage).not.toHaveBeenCalled();
+    expect(emitEvent).not.toHaveBeenCalled();
+
+    await manager.respondToUserInput(
+      asThreadId("thread_1"),
+      ApprovalRequestId.makeUnsafe("req-user-input-1"),
+      {
+        scope: "Runtime first",
+      },
+    );
+
+    expect(writeMessage).toHaveBeenCalledWith(context, {
+      id: 42,
+      result: {
+        answers: {
+          scope: { answers: ["Runtime first"] },
+        },
+      },
+    });
+  });
+
+  it("uses the first prompt option when a pending answer is null", async () => {
+    const { manager, context, writeMessage } = createPendingUserInputHarness();
+    const pendingRequest = context.pendingUserInputs.get(
+      ApprovalRequestId.makeUnsafe("req-user-input-1"),
+    );
+    if (!pendingRequest) {
+      throw new Error("missing pending request");
+    }
+    pendingRequest.questions = [
+      {
+        id: "scope",
+        header: "Scope",
+        question: "What should this target first?",
+        options: [
+          {
+            label: "Runtime first (Recommended)",
+            description: "Use the default selected path.",
+          },
+          {
+            label: "Runtime + DB",
+            description: "Also change persistence behavior.",
+          },
+        ],
+      },
+    ];
+
+    await manager.respondToUserInput(
+      asThreadId("thread_1"),
+      ApprovalRequestId.makeUnsafe("req-user-input-1"),
+      {
+        scope: null,
+      },
+    );
+
+    expect(writeMessage).toHaveBeenCalledWith(context, {
+      id: 42,
+      result: {
+        answers: {
+          scope: { answers: ["Runtime first (Recommended)"] },
+        },
+      },
+    });
+  });
+
   it("tracks file-read approval requests with the correct method", () => {
     const manager = new CodexAppServerManager();
     const context = {
