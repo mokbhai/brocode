@@ -13,13 +13,18 @@ import { SqlitePersistenceMemory } from "../../persistence/Layers/Sqlite.ts";
 import { AutomationEngineService } from "../Services/AutomationEngine.ts";
 import { AutomationEngineLive } from "./AutomationEngine.ts";
 import { AutomationEventStoreLive } from "./AutomationEventStore.ts";
+import { AUTOMATION_PROJECTOR_NAME, AutomationProjectionPipelineLive } from "./AutomationProjectionPipeline.ts";
 
 const automationId = AutomationId.makeUnsafe("automation-engine-1");
 const projectId = ProjectId.makeUnsafe("project-automation-engine");
 
 async function createAutomationSystem() {
-  const layer = AutomationEngineLive.pipe(
+  const projectionPipelineLayer = AutomationProjectionPipelineLive.pipe(
     Layer.provide(AutomationEventStoreLive),
+  );
+  const infrastructureLayer = Layer.mergeAll(AutomationEventStoreLive, projectionPipelineLayer);
+  const layer = AutomationEngineLive.pipe(
+    Layer.provide(infrastructureLayer),
     Layer.provideMerge(SqlitePersistenceMemory),
   );
   const runtime = ManagedRuntime.make(layer);
@@ -88,6 +93,20 @@ describe("AutomationEngine", () => {
       system.sql<{ readonly count: number }>`SELECT COUNT(*) AS count FROM automation_events`,
     );
     expect(rows).toEqual([{ count: 1 }]);
+
+    const projectionRows = await system.run(
+      system.sql<{ readonly automationId: string; readonly lastAppliedSequence: number }>`
+        SELECT
+          a.automation_id AS "automationId",
+          s.last_applied_sequence AS "lastAppliedSequence"
+        FROM projection_automations a
+        CROSS JOIN projection_automation_state s
+        WHERE s.projector = ${AUTOMATION_PROJECTOR_NAME}
+      `,
+    );
+    expect(projectionRows).toEqual([
+      { automationId, lastAppliedSequence: result.sequence },
+    ]);
 
     await system.dispose();
   });
