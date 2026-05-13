@@ -49,6 +49,7 @@ const automation = (overrides: Partial<Automation> = {}): Automation => ({
   resultThreadId: null,
   nextRunAt: now,
   lastRunAt: null,
+  deletedAt: null,
   createdAt: now,
   updatedAt: now,
   ...overrides,
@@ -163,6 +164,7 @@ it.effect("marks deleted automation while preserving history", () =>
 
     assert.strictEqual(model.automations.length, 1);
     assert.strictEqual(model.automations[0]?.status, "deleted");
+    assert.strictEqual(model.automations[0]?.deletedAt, "2026-05-13T00:00:02.000Z");
     assert.strictEqual(model.automations[0]?.updatedAt, "2026-05-13T00:00:02.000Z");
   }),
 );

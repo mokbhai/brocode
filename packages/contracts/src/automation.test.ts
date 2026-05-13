@@ -33,12 +33,14 @@ it.effect("decodes an automation with local environment as an explicit value", (
       resultThreadId: null,
       nextRunAt: now,
       lastRunAt: null,
+      deletedAt: null,
       createdAt: now,
       updatedAt: now,
     });
 
     assert.strictEqual(automation.environmentMode, "local");
     assert.strictEqual(automation.writePolicy.allowDirtyLocalCheckout, false);
+    assert.strictEqual(automation.deletedAt, null);
   }),
 );
 

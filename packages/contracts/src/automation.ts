@@ -148,6 +148,7 @@ export const Automation = Schema.Struct({
   resultThreadId: NullableThreadId,
   nextRunAt: NullableIsoDateTime,
   lastRunAt: NullableIsoDateTime,
+  deletedAt: NullableIsoDateTime,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

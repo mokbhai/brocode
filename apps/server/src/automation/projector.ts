@@ -122,6 +122,7 @@ export function projectAutomationEvent(
           ...nextBase,
           automations: updateAutomation(nextBase.automations, payload.automationId, {
             status: "deleted",
+            deletedAt: payload.deletedAt,
             updatedAt: payload.deletedAt,
           }),
         })),

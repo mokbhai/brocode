@@ -39,6 +39,7 @@ const automation = (overrides: Partial<Automation> = {}): Automation => ({
   resultThreadId: null,
   nextRunAt: now,
   lastRunAt: null,
+  deletedAt: null,
   createdAt: now,
   updatedAt: now,
   ...overrides,
@@ -102,6 +103,7 @@ it.effect("creates an enabled local automation", () =>
     });
     assert.strictEqual(events.payload.automation.resultThreadId, null);
     assert.strictEqual(events.payload.automation.lastRunAt, null);
+    assert.strictEqual(events.payload.automation.deletedAt, null);
   }),
 );
 
@@ -113,6 +115,44 @@ it.effect("rejects duplicate active automation creation", () =>
         command: {
           type: "automation.create",
           commandId: CommandId.makeUnsafe("cmd-create-duplicate"),
+          automationId,
+          title: "Daily standup",
+          prompt: "Summarize",
+          target: { type: "project", projectId },
+          schedule: { kind: "daily", hour: 9, minute: 0 },
+          timezone: "Asia/Kolkata",
+          environmentMode: "local",
+          writesEnabled: true,
+          allowDirtyLocalCheckout: false,
+          modelSelection: { provider: "codex", model: "gpt-5.2" },
+          runtimeMode: "full-access",
+          nextRunAt: now,
+          createdAt: now,
+        },
+      }),
+    );
+
+    assert.strictEqual(result._tag, "Failure");
+    assert.strictEqual(String(result.cause).includes("already exists"), true);
+  }),
+);
+
+it.effect("rejects duplicate deleted automation creation", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(
+      decideAutomationCommand({
+        readModel: readModelWithAutomation({
+          automations: [
+            automation({
+              status: "deleted",
+              deletedAt: later,
+              updatedAt: later,
+            }),
+          ],
+        }),
+        command: {
+          type: "automation.create",
+          commandId: CommandId.makeUnsafe("cmd-create-deleted-duplicate"),
           automationId,
           title: "Daily standup",
           prompt: "Summarize",
@@ -162,6 +202,7 @@ it.effect("rejects enable and disable commands for deleted automations", () =>
         automation({
           id: deletedAutomationId,
           status: "deleted",
+          deletedAt: later,
           updatedAt: later,
         }),
       ],
